@@ -99,6 +99,31 @@ def test_rejects_out_of_range_values(raw, section, key, value):
         config_from_dict(raw)
 
 
+@pytest.mark.parametrize("section, key, value", [
+    ("sim", "capacity", 6000.5),
+    ("sim", "think_interval", 2.5),
+    ("sim", "capacity", True),
+    ("reproduction", "max_litter", "4"),
+    ("movement", "steering", "0.25"),
+])
+def test_rejects_wrong_types(raw, section, key, value):
+    raw[section][key] = value
+    with pytest.raises(ValueError, match=rf"\[{section}\] {key}"):
+        config_from_dict(raw)
+
+
+def test_rejects_fractional_species_count(raw):
+    raw["species"][0]["count"] = 80.9
+    with pytest.raises(ValueError, match="count=80.9"):
+        config_from_dict(raw)
+
+
+def test_rejects_duplicate_species_names(raw):
+    raw["species"][1]["name"] = raw["species"][0]["name"]
+    with pytest.raises(ValueError, match="repetidos"):
+        config_from_dict(raw)
+
+
 def test_rejects_world_not_multiple_of_cell_size(raw):
     raw["world"]["width"] = 1610.0                     # cell_size = 20
     with pytest.raises(ValueError, match="múltiplo"):

@@ -77,8 +77,6 @@ and the key.
 - **Simulation separate from rendering.** The simulation knows nothing about graphics;
   the procedural animation is plain geometry that any renderer can draw.
 
-The reasoning behind each decision is recorded in [docs/adr](docs/adr).
-
 ## Project layout
 
 ```

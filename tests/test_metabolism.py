@@ -27,6 +27,15 @@ def test_cannot_eat_from_afar(make_world):
     assert w.energy[0] == 0.0
 
 
+def test_pure_carnivore_does_not_strip_grass(make_world):
+    w = make_world(n=1, energy=10.0, reserve=1000.0, plant_eff=0.0, radius=3.0,
+                   action=Action.EAT, target=0)
+    w.pos[0] = w.terrain.center_of(np.array([0]))[0]
+    w.terrain.grass[0] = 20.0
+    eat(w)
+    assert w.terrain.grass[0] == 20.0 and w.energy[0] == 10.0
+
+
 def test_bergmann_cold_costs_less_for_large_bodies(make_world):
     w = make_world(n=2, appetite=1.0, energy=100.0, vel=0.0)
     cold = np.flatnonzero(w.terrain.biome == Biome.TUNDRA)[0]

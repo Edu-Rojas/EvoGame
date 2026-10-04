@@ -31,9 +31,11 @@ def eat(w: World) -> None:
     if len(eaters) == 0:
         return
 
-    eff = np.maximum(w.plant_eff[eaters], 1e-6)
-    room = np.maximum(w.reserve[eaters] - w.energy[eaters], 0.0) / eff  # no desperdiciar
-    want = np.minimum(b.bite, room)
+    eff = w.plant_eff[eaters]
+    room = np.maximum(w.reserve[eaters] - w.energy[eaters], 0.0)
+    # pasto que le cabe, contando lo que de verdad aprovecha; quien no saca nada de
+    # las plantas (carnívoro puro) no arranca pasto para nada
+    want = np.where(eff > 0, np.minimum(b.bite, room / np.maximum(eff, 1e-12)), 0.0)
 
     n_cells = len(t.grass)
     demand = np.bincount(cell, weights=want, minlength=n_cells)

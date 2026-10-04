@@ -13,6 +13,13 @@ def test_hungry_creature_with_food_in_sight_eats(make_world):
     assert w.action[0] == Action.EAT and w.target[0] == 42
 
 
+def test_carnivore_ignores_grass(make_world):
+    w = make_world(n=1, energy=1.0, reserve=100.0, instinct=1.0, plant_eff=0.0)
+    p = Perception(food=np.array([42]), mate=np.array([NO_TARGET]))
+    decide(w, np.array([0]), p, ready=np.zeros(len(w.alive), dtype=bool))
+    assert w.action[0] != Action.EAT
+
+
 def test_nothing_in_sight_means_explore(make_world):
     w = make_world(n=1, energy=1.0, reserve=100.0, instinct=1.0)
     p = Perception(food=np.array([NO_TARGET]), mate=np.array([NO_TARGET]))

@@ -32,6 +32,13 @@ class Action(IntEnum):
 N_ACTIONS = len(Action)
 
 
+class DeathCause(IntEnum):
+    """Por qué murió una criatura; columnas de World.deaths_by_cause."""
+    STARVATION = 0
+    OLD_AGE = 1
+    PREDATION = 2
+
+
 NO_TARGET = -1
 
 
@@ -72,6 +79,8 @@ class World:
     # --- contadores de eventos (para métricas) ---
     births_total: int = 0
     deaths_total: int = 0
+    deaths_by_cause: np.ndarray = field(init=False)   # [especies, DeathCause]
+    extinct_at: np.ndarray = field(init=False)        # [especies] tick de extinción o -1
 
     # tamaño del mundo [ancho, alto]; se usa en cada wrap/torus_delta, así que se
     # calcula una vez (no es una property que cree un array en cada lectura)
@@ -144,6 +153,8 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
     for name in ("radius", "reserve", "vmax", "det_radius", "appetite", "aging_rate", "plant_eff"):
         setattr(w, name, np.zeros(n))
 
+    w.deaths_by_cause = np.zeros((len(cfg.species), len(DeathCause)), dtype=np.int64)
+    w.extinct_at = np.full(len(cfg.species), -1, dtype=np.int64)
     w.terrain = create_terrain(cfg, rng)
 
     sigmas = mutation_sigmas(cfg.genes.mutation_sigma, cfg.genes.inactive)

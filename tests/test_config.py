@@ -3,12 +3,12 @@ import tomllib
 
 import pytest
 
-from especies.config import DEFAULT_PATH, config_from_dict, load_config
+from especies.config import DEFAULT_CONFIG, config_from_dict, load_config
 
 
 @pytest.fixture(scope="module")
 def default_raw():
-    with open(DEFAULT_PATH, "rb") as f:
+    with DEFAULT_CONFIG.open("rb") as f:
         return tomllib.load(f)
 
 
@@ -21,6 +21,12 @@ def raw(default_raw):
 def test_default_config_loads():
     cfg = load_config()
     assert len(cfg.species) > 0
+
+
+def test_loads_config_from_a_path(tmp_path):
+    p = tmp_path / "mine.toml"
+    p.write_bytes(DEFAULT_CONFIG.read_bytes())
+    assert load_config(p) == load_config()
 
 
 def test_rejects_unknown_section(raw):

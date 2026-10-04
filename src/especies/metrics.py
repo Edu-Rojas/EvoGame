@@ -36,16 +36,33 @@ def summarize(w: World) -> list[SpeciesSummary]:
     return out
 
 
-def describe_creature(w: World, slot: int) -> dict:
+@dataclass(frozen=True)
+class CreatureInfo:
+    """Ficha de una criatura con datos crudos: el formato lo pone cada cliente
+    (el visor redondea y traduce; la API la serializa con dataclasses.asdict)."""
+    uid: int
+    species: str
+    generation: int
+    parents: tuple[int, int]        # uid de los padres (-1 = fundador)
+    genes: dict[str, float]         # clave del TOML -> valor 1..10
+    instincts: dict[str, float]     # acción -> multiplicador heredable
+    energy: float
+    reserve: float
+    age: float
+    action: str                     # nombre de la acción en minúsculas (Action)
+
+
+def describe_creature(w: World, slot: int) -> CreatureInfo:
     """Ficha de una criatura (para el clic en el visor y, después, la API)."""
-    return {
-        "uid": int(w.uid[slot]),
-        "species": w.cfg.species[w.species[slot]].name,
-        "generation": int(w.generation[slot]),
-        "parents": (int(w.parent_a[slot]), int(w.parent_b[slot])),
-        "genes": {g.key: round(float(w.genes[slot, g]), 2) for g in Gene},
-        "instincts": [round(float(v), 2) for v in w.instinct[slot]],
-        "energy": f"{w.energy[slot]:.0f}/{w.reserve[slot]:.0f}",
-        "age": int(w.age[slot]),
-        "action": Action.LABELS[w.action[slot]],
-    }
+    return CreatureInfo(
+        uid=int(w.uid[slot]),
+        species=w.cfg.species[w.species[slot]].name,
+        generation=int(w.generation[slot]),
+        parents=(int(w.parent_a[slot]), int(w.parent_b[slot])),
+        genes={g.key: float(w.genes[slot, g]) for g in Gene},
+        instincts={a.name.lower(): float(w.instinct[slot, a]) for a in Action},
+        energy=float(w.energy[slot]),
+        reserve=float(w.reserve[slot]),
+        age=float(w.age[slot]),
+        action=Action(int(w.action[slot])).name.lower(),
+    )

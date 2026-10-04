@@ -24,7 +24,7 @@ import pygame
 from especies.config import load_config
 from especies.genes import Gene, norm
 from especies.geometry import torus_delta, wrap
-from especies.metrics import describe_creature
+from especies.metrics import CreatureInfo, describe_creature
 from especies.state import World, create_world
 from especies.step import step
 from especies.terrain import Biome
@@ -38,12 +38,24 @@ MAX_SCREEN = np.array([1400.0, 860.0])
 MAX_ZOOM = 12.0
 PIXEL_SIZES = (2, 3, 4)
 MAX_TICKS_PER_FRAME = 50
-# Etiquetas de la ficha de criatura en el HUD (la simulación devuelve claves neutras)
-CREATURE_LABELS = {
-    "uid": "uid", "species": "especie", "generation": "generacion", "parents": "padres",
-    "genes": "genes", "instincts": "instintos", "energy": "energia", "age": "edad",
-    "action": "accion",
-}
+# Textos del HUD (la simulación devuelve datos crudos con claves neutras)
+ACTION_LABELS = {"explore": "explorar", "eat": "comer", "mate": "aparearse"}
+
+
+def creature_card(info: CreatureInfo) -> list[str]:
+    """Ficha de criatura formateada para el jugador."""
+    genes = " ".join(f"{k[:3]} {v:.1f}" for k, v in info.genes.items())
+    instincts = " ".join(f"{ACTION_LABELS[k]} {v:.2f}" for k, v in info.instincts.items())
+    a, b = info.parents
+    parents = "fundador" if a < 0 else f"#{a} y #{b}"
+    return [
+        f"criatura #{info.uid} · {info.species}",
+        f"generación {info.generation} · padres {parents}",
+        f"energía {info.energy:.0f}/{info.reserve:.0f} · edad {info.age:.0f}",
+        f"haciendo: {ACTION_LABELS[info.action]}",
+        f"genes: {genes}",
+        f"instintos: {instincts}",
+    ]
 
 
 class Camera:
@@ -290,11 +302,9 @@ class Viewer:
         self._panel([(info, pal.INK)], (10, int(self.cam.screen[1]) - 48))
 
         if sel is not None:
-            card = [(f"criatura #{w.uid[sel]}", pal.INK)]
-            for k, val in describe_creature(w, sel).items():
-                if k != "uid":
-                    card.append((f"{CREATURE_LABELS[k]}: {val}", pal.INK))
-            self._panel(card, (int(self.cam.screen[0]) - 470, 10))
+            card = [(text, pal.INK) for text in creature_card(describe_creature(w, sel))]
+            width = max(self.font.size(t)[0] for t, _ in card) + 20
+            self._panel(card, (int(self.cam.screen[0]) - width - 10, 10))
 
     def run(self) -> None:
         running = True

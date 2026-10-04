@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import secrets
 from dataclasses import dataclass, field
+from enum import IntEnum
 
 import numpy as np
 
@@ -21,13 +22,14 @@ from .geometry import wrap
 from .terrain import Terrain, create_terrain
 
 
-class Action:
+class Action(IntEnum):
     """Acciones de la v1a. Se usan como índices de columna (instintos, utilidades)."""
     EXPLORE = 0
     EAT = 1
     MATE = 2
-    N = 3
-    LABELS = ("explorar", "comer", "aparearse")
+
+
+N_ACTIONS = len(Action)
 
 
 NO_TARGET = -1
@@ -126,7 +128,7 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
     w.species = np.zeros(n, dtype=np.int16)
     w.generation = np.zeros(n, dtype=np.int32)
     w.genes = np.ones((n, N_GENES))
-    w.instinct = np.ones((n, Action.N))
+    w.instinct = np.ones((n, N_ACTIONS))
     w.pos = np.zeros((n, 2))
     w.vel = np.zeros((n, 2))
     w.heading = np.zeros(n)
@@ -149,7 +151,7 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
             w,
             species=np.full(sp.count, sp_id),
             genes=genes,
-            instinct=np.ones((sp.count, Action.N)),
+            instinct=np.ones((sp.count, N_ACTIONS)),
             pos=rng.random((sp.count, 2)) * w.size,
             energy=None,  # se calcula con la reserva
             age=rng.random(sp.count) * cfg.body.base_lifespan * cfg.body.founder_max_age,

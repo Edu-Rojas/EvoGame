@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 
 from .genes import GENE_MAX, GENE_MIN, Gene, crossover, mutate, stochastic_round
-from .physics import torus_delta
+from .geometry import torus_delta
 from .state import Action, NO_TARGET, World, spawn
 
 

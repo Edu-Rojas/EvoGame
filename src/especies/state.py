@@ -16,6 +16,7 @@ import numpy as np
 
 from .config import Config
 from .genes import Gene, N_GENES, norm
+from .geometry import wrap
 from .terrain import Terrain, create_terrain
 
 
@@ -180,7 +181,7 @@ def spawn(w: World, *, species, genes, instinct, pos, energy, age, generation,
     w.generation[s] = np.asarray(generation)[:k]
     w.genes[s] = genes
     w.instinct[s] = np.asarray(instinct)[:k]
-    w.pos[s] = np.mod(np.asarray(pos)[:k], w.size)
+    w.pos[s] = wrap(np.asarray(pos)[:k], w.size)
     w.vel[s] = 0.0
     w.heading[s] = w.rng.random(k) * 2 * np.pi
     w.age[s] = np.asarray(age)[:k]

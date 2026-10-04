@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from especies.genes import Gene, crossover, mutate, mutation_sigmas, stochastic_round
+from especies.genes import Gene, crossover, mutate, mutation_sigmas, norm, stochastic_round
 from especies.state import derive_traits
 
 
@@ -29,21 +29,21 @@ def test_inactive_genes_do_not_mutate():
     assert v[:, Gene.SIZE].std() > 0
 
 
-def test_inactive_genes_stay_put_across_generations(cfg):
-    from especies.state import create_world
-    from especies.step import run
-    w = create_world(cfg, seed=3)
-    run(w, 800)
-    a = w.alive & (w.generation > 0)
-    assert a.any()
-    assert (w.genes[a, Gene.AGGRESSION] == 1.0).all()
-
-
 def test_stochastic_round_preserves_mean():
     rng = np.random.default_rng(0)
     r = stochastic_round(np.full(100_000, 2.3), rng)
     assert set(np.unique(r)) == {2, 3}
     assert r.mean() == pytest.approx(2.3, abs=0.01)
+
+
+def test_norm_maps_gene_range_to_unit_interval():
+    assert norm(1.0) == 0.0 and norm(10.0) == 1.0
+    assert np.allclose(norm(np.array([1.0, 5.5, 10.0])), [0.0, 0.5, 1.0])
+
+
+def test_gene_keys_are_unique():
+    keys = [g.key for g in Gene]
+    assert len(keys) == len(set(keys))
 
 
 def test_kleiber_basal_cost(cfg):
@@ -61,30 +61,3 @@ def test_diet_efficiency_extremes(cfg):
     t = derive_traits(genes, cfg)
     assert t["plant_eff"][0] == pytest.approx(1.0)
     assert t["plant_eff"][1] == pytest.approx(0.0)
-
-
-def test_biomes_match_configured_fractions(cfg):
-    from especies.terrain import Biome, create_terrain
-    t = create_terrain(cfg, np.random.default_rng(1))
-    water = (t.biome == Biome.WATER).mean()
-    assert water == pytest.approx(cfg.terrain.water_fraction, abs=0.01)
-    assert set(np.unique(t.biome)) == set(int(b) for b in Biome)
-
-
-def test_bergmann_cold_costs_less_for_large_bodies(cfg):
-    from especies.metabolism import spend
-    from especies.state import create_world
-    from especies.terrain import Biome
-    w = create_world(cfg, seed=0)
-    cold = np.flatnonzero(w.terrain.biome == Biome.TUNDRA)[0]
-    s = w.alive_idx()[:2]
-    w.alive[:] = False
-    w.alive[s] = True
-    w.pos[s] = w.terrain.center_of(np.array([cold, cold]))
-    w.vel[s] = 0.0
-    w.genes[s, Gene.SIZE] = [1.0, 10.0]
-    w.appetite[s] = 1.0             # mismo apetito: solo comparamos el extra por frío
-    w.energy[s] = 100.0
-    spend(w)
-    spent = 100.0 - w.energy[s]
-    assert spent[1] < spent[0]

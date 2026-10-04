@@ -27,6 +27,28 @@ def _full_world_with_a_couple(cfg, free_slots: int):
     return w, ready
 
 
+def test_litter_size_by_mating_gene(cfg):
+    from especies.reproduction import litter_size
+    w = create_world(cfg, seed=0)
+    assert {litter_size(1.0, 1.0, w) for _ in range(200)} == {1}
+    assert {litter_size(10.0, 10.0, w) for _ in range(200)} == {cfg.reproduction.max_litter}
+    mid = [litter_size(5.5, 5.5, w) for _ in range(4000)]
+    assert np.mean(mid) == pytest.approx(2.5, abs=0.05)   # redondeo al azar
+
+
+def test_offspring_inherit_correctly(cfg):
+    from especies.step import run
+    w = create_world(cfg, seed=11)
+    run(w, 800)
+    kids = np.flatnonzero(w.alive & (w.generation > 0))
+    assert len(kids) > 0
+    assert (w.genes[kids] >= 1).all() and (w.genes[kids] <= 10).all()
+    assert (w.parent_a[kids] >= 0).all() and (w.parent_b[kids] >= 0).all()
+    assert (w.parent_a[kids] != w.parent_b[kids]).all()   # dos padres distintos
+    lo, hi = cfg.behavior.instinct_min, cfg.behavior.instinct_max
+    assert (w.instinct[kids] >= lo).all() and (w.instinct[kids] <= hi).all()
+
+
 def test_litter_size_follows_max_litter(cfg):
     from dataclasses import replace
 

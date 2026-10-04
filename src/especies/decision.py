@@ -10,15 +10,15 @@ from __future__ import annotations
 import numpy as np
 
 from .perception import Perception
-from .state import NO_TARGET, Action, World
+from .state import N_ACTIONS, NO_TARGET, Action, World
 
 
 def utilities(w: World, thinkers: np.ndarray, p: Perception, ready: np.ndarray) -> np.ndarray:
-    """Matriz [n_thinkers, Action.N] con el puntaje de cada acción."""
+    """Matriz [n_thinkers, N_ACTIONS] con el puntaje de cada acción."""
     b = w.cfg.behavior
     hunger = 1.0 - np.clip(w.energy[thinkers] / w.reserve[thinkers], 0.0, 1.0)
 
-    u = np.zeros((len(thinkers), Action.N))
+    u = np.zeros((len(thinkers), N_ACTIONS))
     u[:, Action.EXPLORE] = b.explore_base
     u[:, Action.EAT] = (p.food != NO_TARGET) * (b.eat_base + hunger)
     u[:, Action.MATE] = (p.mate != NO_TARGET) * ready[thinkers] * b.mate_base

@@ -81,13 +81,11 @@ viewer/              visor pygame (solo lee el estado)
   render.py          pixel art: terreno con dithering y garabatos, criaturas con LOD
   app.py             cámara, entrada, interpolación entre ticks y HUD
 tests/               pytest, un archivo por módulo
-docs/adr/            decisiones de arquitectura
 ```
 
 ## Documentación
 
 - [CHANGELOG.md](CHANGELOG.md): cambios por versión.
-- [docs/adr/](docs/adr/README.md): por qué el código está hecho así.
 
 ## Qué hay hasta la 1b y qué falta
 
@@ -99,6 +97,6 @@ docs/adr/            decisiones de arquitectura
 - Hojas altas en el bosque: el nicho propio de los grandes.
 - Coexistencia: sin mecanismos, la especie que más se reproduce excluye a las demás en
   una generación. Las mecánicas que la estabilizan están en
-  [docs/adr/0006](docs/adr/0006-coexistence-mechanisms.md). Hoy, en 4 de 5 semillas
+  [tests/test_stabilizers.py](tests/test_stabilizers.py). Hoy, en 4 de 5 semillas
   sobreviven al menos 3 especies durante 50.000 ticks.
 - **1c:** camuflaje, esconderse/acechar, fatiga de Aceleración.

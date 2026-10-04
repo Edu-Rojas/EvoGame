@@ -1,4 +1,4 @@
-"""Mecánicas que estabilizan la coexistencia (ver docs/adr/0006)."""
+"""Mecánicas que estabilizan la coexistencia."""
 from dataclasses import replace
 
 import numpy as np

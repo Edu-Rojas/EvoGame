@@ -36,7 +36,6 @@ All notable changes to this project are documented here. The format follows
 - ruff (including security rules) and mypy configuration.
 - CI: lint, type check, tests on Linux and Windows (Python 3.11 and 3.13),
   secret scanning and dependency audit.
-- Architecture decision records in `docs/adr/`.
 
 ### Changed
 - The default config ships inside the package (`src/especies/data/default.toml`)

@@ -19,4 +19,8 @@ def test_deaths_are_counted_by_cause(cfg):
     w = create_world(cfg, seed=2)
     run(w, 400)
     assert w.deaths_by_cause.sum() == w.deaths_total
-    assert w.deaths_by_cause[:, DeathCause.PREDATION].sum() == 0   # todavía no hay caza
+    hunted = dict(zip([s.name for s in cfg.species],
+                      w.deaths_by_cause[:, DeathCause.PREDATION], strict=True))
+    assert hunted["Conejos"] > 0
+    assert hunted["Elefantes"] == 0          # refugio por tamaño: demasiado grandes
+    assert hunted["Lobos"] == 0              # nadie caza a su propia especie

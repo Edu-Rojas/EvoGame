@@ -54,6 +54,10 @@ def move(w: World) -> None:
         safe = np.maximum(dist, 1e-9)[:, None]
         direction[i] = delta / safe
         speed[i] = np.minimum(vmax[i], dist * ARRIVAL_SLOWDOWN)
+        # huir: en sentido contrario a la amenaza y a toda velocidad, sin frenar
+        flee = act[i] == Action.FLEE
+        direction[i[flee]] *= -1.0
+        speed[i[flee]] = vmax[i[flee]]
 
     desired = direction * speed[:, None]
     w.vel[a] += m.steering * (desired - w.vel[a])

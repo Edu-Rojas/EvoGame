@@ -48,6 +48,9 @@ class CreatureInfo:
     instincts: dict[str, float]     # acción -> multiplicador heredable
     energy: float
     reserve: float
+    health: float
+    max_health: float
+    kills: int
     age: float
     action: str                     # nombre de la acción en minúsculas (Action)
 
@@ -63,6 +66,9 @@ def describe_creature(w: World, slot: int) -> CreatureInfo:
         instincts={a.name.lower(): float(w.instinct[slot, a]) for a in Action},
         energy=float(w.energy[slot]),
         reserve=float(w.reserve[slot]),
+        health=float(w.health[slot]),
+        max_health=float(w.max_health[slot]),
+        kills=int(w.kills[slot]),
         age=float(w.age[slot]),
         action=Action(int(w.action[slot])).name.lower(),
     )

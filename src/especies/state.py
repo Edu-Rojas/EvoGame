@@ -23,10 +23,16 @@ from .terrain import Terrain, create_terrain
 
 
 class Action(IntEnum):
-    """Acciones de la v1a. Se usan como índices de columna (instintos, utilidades)."""
+    """Acciones. Se usan como índices de columna (instintos, utilidades)."""
     EXPLORE = 0
     EAT = 1
     MATE = 2
+    HUNT = 3
+    FLEE = 4
+
+
+# Acciones cuyo objetivo es otra criatura (se valida por uid, no solo por slot)
+CREATURE_TARGETS = (Action.MATE, Action.HUNT, Action.FLEE)
 
 
 N_ACTIONS = len(Action)
@@ -66,6 +72,11 @@ class World:
     cooldown: np.ndarray = field(init=False)
     action: np.ndarray = field(init=False)
     target: np.ndarray = field(init=False)
+    target_uid: np.ndarray = field(init=False)   # uid del objetivo si es una criatura
+    health: np.ndarray = field(init=False)
+    hunt_ticks: np.ndarray = field(init=False)   # ticks persiguiendo la presa actual
+    last_hitter: np.ndarray = field(init=False)  # uid del último que la mordió (-1 = nadie)
+    kills: np.ndarray = field(init=False)
     # --- rasgos derivados de los genes (se calculan una vez al nacer) ---
     radius: np.ndarray = field(init=False)
     reserve: np.ndarray = field(init=False)
@@ -74,6 +85,13 @@ class World:
     appetite: np.ndarray = field(init=False)
     aging_rate: np.ndarray = field(init=False)
     plant_eff: np.ndarray = field(init=False)
+    meat_eff: np.ndarray = field(init=False)
+    max_health: np.ndarray = field(init=False)
+    bite_damage: np.ndarray = field(init=False)
+    retaliation: np.ndarray = field(init=False)      # fracción del daño propio que devuelve
+    aggression_factor: np.ndarray = field(init=False)
+    chase_limit: np.ndarray = field(init=False)
+    leaf_reach: np.ndarray = field(init=False)
     # --- terreno: biomas + pasto por celda ---
     terrain: Terrain = field(init=False)
     # --- contadores de eventos (para métricas) ---
@@ -100,16 +118,30 @@ def derive_traits(genes: np.ndarray, cfg: Config) -> dict[str, np.ndarray]:
     Es la única función que sabe "qué hace cada gen" con el cuerpo, así que
     retocar el balance de un gen es tocar aquí y en la config, no por todo el código.
     """
-    b, m, d = cfg.body, cfg.movement, cfg.detection
+    b, m, d, c, lv = cfg.body, cfg.movement, cfg.detection, cfg.combat, cfg.leaves
     size = genes[:, Gene.SIZE]
     x_acc = norm(genes[:, Gene.ACCELERATION])
+    x_agg = norm(genes[:, Gene.AGGRESSION])
     x_det = norm(genes[:, Gene.DETECTION])
     x_diet = norm(genes[:, Gene.DIET])
     x_mate = norm(genes[:, Gene.MATING])
     x_size = norm(size)
 
     kleiber = size ** b.kleiber_exponent
+    # colmillos: los carnívoros muerden más fuerte que los herbívoros
+    weapons = c.weapons_herbivore + (c.weapons_carnivore - c.weapons_herbivore) * x_diet
+    bite_damage = c.bite_base * size ** c.bite_size_exponent * weapons
     return {
+        "max_health": c.health_per_size * size,
+        "bite_damage": bite_damage,
+        # un dócil casi no devuelve el golpe; un agresivo grande puede matar al cazador
+        "retaliation": x_agg * c.retaliation,
+        "aggression_factor": c.aggression_factor_min
+                             + (c.aggression_factor_max - c.aggression_factor_min) * x_agg,
+        "chase_limit": c.chase_ticks * (c.chase_min_mult + (c.chase_max_mult - c.chase_min_mult) * x_agg),
+        "meat_eff": x_diet ** cfg.diet.exponent,
+        # hojas altas: nada por debajo de un tamaño, todas desde otro (jirafa vs conejo)
+        "leaf_reach": np.clip((size - lv.reach_min_size) / (lv.reach_full_size - lv.reach_min_size), 0, 1),
         # radio: el área (2D) escala con la masa, así que el radio va con la raíz
         "radius": b.base_radius * np.sqrt(size),
         "reserve": b.reserve_per_size * size,
@@ -122,6 +154,11 @@ def derive_traits(genes: np.ndarray, cfg: Config) -> dict[str, np.ndarray]:
         "aging_rate": 1 + b.aging_extra_at_max * x_size ** b.aging_curve,
         "plant_eff": (1 - x_diet) ** cfg.diet.exponent,
     }
+
+
+TRAITS = ("radius", "reserve", "vmax", "det_radius", "appetite", "aging_rate", "plant_eff",
+          "meat_eff", "max_health", "bite_damage", "retaliation", "aggression_factor",
+          "chase_limit", "leaf_reach")
 
 
 def create_world(cfg: Config, seed: int | None = None) -> World:
@@ -150,7 +187,12 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
     w.cooldown = np.zeros(n, dtype=np.int32)
     w.action = np.zeros(n, dtype=np.int8)
     w.target = np.full(n, NO_TARGET, dtype=np.int32)
-    for name in ("radius", "reserve", "vmax", "det_radius", "appetite", "aging_rate", "plant_eff"):
+    w.target_uid = np.full(n, -1, dtype=np.int64)
+    w.health = np.zeros(n)
+    w.hunt_ticks = np.zeros(n, dtype=np.int32)
+    w.last_hitter = np.full(n, -1, dtype=np.int64)
+    w.kills = np.zeros(n, dtype=np.int32)
+    for name in TRAITS:
         setattr(w, name, np.zeros(n))
 
     w.deaths_by_cause = np.zeros((len(cfg.species), len(DeathCause)), dtype=np.int64)
@@ -178,10 +220,11 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
 
 
 def spawn(w: World, *, species, genes, instinct, pos, energy, age, generation,
-          parent_a, parent_b) -> int:
+          parent_a, parent_b, health_frac=None) -> int:
     """Inserta un lote de criaturas en slots libres. Devuelve cuántas cupieron.
 
     Si no hay slots libres (tope duro de rendimiento), las que sobran no nacen.
+    `health_frac`: vida inicial como fracción de la máxima (por defecto, completa).
     """
     free = np.flatnonzero(~w.alive)
     k = min(len(free), len(species))
@@ -207,8 +250,14 @@ def spawn(w: World, *, species, genes, instinct, pos, energy, age, generation,
     w.cooldown[s] = 0
     w.action[s] = Action.EXPLORE
     w.target[s] = NO_TARGET
+    w.target_uid[s] = -1
+    w.hunt_ticks[s] = 0
+    w.last_hitter[s] = -1
+    w.kills[s] = 0
     for name, values in traits.items():
         getattr(w, name)[s] = values
+    frac = 1.0 if health_frac is None else np.asarray(health_frac)[:k]
+    w.health[s] = w.max_health[s] * frac
     if energy is None:
         w.energy[s] = w.reserve[s] * w.cfg.body.founder_energy
     else:

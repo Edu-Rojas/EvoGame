@@ -79,8 +79,9 @@ def test_rejects_zero_think_interval(raw):
 
 
 def test_rejects_capacity_below_founders(raw):
-    raw["sim"]["capacity"] = 100                       # hay 190 fundadores
-    with pytest.raises(ValueError, match="no alcanza para los 190 fundadores"):
+    founders = sum(s["count"] for s in raw["species"])
+    raw["sim"]["capacity"] = founders - 1
+    with pytest.raises(ValueError, match=f"no alcanza para los {founders} fundadores"):
         config_from_dict(raw)
 
 

@@ -5,7 +5,7 @@ import numpy as np
 
 from .genes import Gene
 from .geometry import torus_delta
-from .state import NO_TARGET, Action, World
+from .state import NO_TARGET, Action, DeathCause, World
 from .terrain import Biome
 
 # Cuán cerca del centro de la celda hay que estar para pastar, en celdas (geometría:
@@ -71,13 +71,28 @@ def spend(w: World) -> None:
 
 
 def die(w: World) -> np.ndarray:
-    """Muere quien se queda sin energía o llega al final de su vida. Devuelve los slots."""
-    dead = w.alive & ((w.energy <= 0) | (w.age >= w.cfg.body.base_lifespan))
-    idx = np.flatnonzero(dead)
+    """Muere quien se queda sin energía o llega al final de su vida. Devuelve los slots.
+
+    Cuenta la causa por especie y anota el tick en que una especie se extingue.
+    """
+    starved = w.alive & (w.energy <= 0)
+    old = w.alive & ~starved & (w.age >= w.cfg.body.base_lifespan)
+    idx = np.flatnonzero(starved | old)
+    if len(idx) == 0:
+        return idx
+    for cause, mask in ((DeathCause.STARVATION, starved), (DeathCause.OLD_AGE, old)):
+        np.add.at(w.deaths_by_cause[:, cause], w.species[mask], 1)
     w.alive[idx] = False
     w.target[idx] = NO_TARGET
     w.deaths_total += len(idx)
+    _mark_extinctions(w, np.unique(w.species[idx]))
     return idx
+
+
+def _mark_extinctions(w: World, species: np.ndarray) -> None:
+    for sp in species:
+        if w.extinct_at[sp] < 0 and not (w.alive & (w.species == sp)).any():
+            w.extinct_at[sp] = w.tick
 
 
 def regrow_grass(w: World) -> None:

@@ -8,6 +8,10 @@ from .geometry import torus_delta
 from .state import Action, NO_TARGET, World
 from .terrain import Biome
 
+# Cuán cerca del centro de la celda hay que estar para pastar, en celdas (geometría:
+# 0,35 queda dentro de la celda incluso en diagonal, sin exigir llegar al centro exacto)
+EAT_REACH_CELLS = 0.35
+
 
 def eat(w: World) -> None:
     """Las criaturas que llegaron a su celda objetivo pastan.
@@ -22,7 +26,7 @@ def eat(w: World) -> None:
         return
     cell = w.target[eaters]
     dist = np.linalg.norm(torus_delta(w.pos[eaters], t.center_of(cell), w.size), axis=1)
-    arrived = dist <= w.radius[eaters] + m.contact_distance + t.cell_size * 0.35
+    arrived = dist <= w.radius[eaters] + m.contact_distance + t.cell_size * EAT_REACH_CELLS
     eaters, cell = eaters[arrived], cell[arrived]
     if len(eaters) == 0:
         return

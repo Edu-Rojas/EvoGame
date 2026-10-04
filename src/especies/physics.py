@@ -7,6 +7,12 @@ from scipy.spatial import cKDTree
 from .geometry import torus_delta, wrap
 from .state import Action, NO_TARGET, World
 
+# Al acercarse al objetivo la velocidad deseada es esta fracción de la distancia que
+# falta: frena suave en vez de pasarse (numérica, no balance)
+ARRIVAL_SLOWDOWN = 0.5
+# Vecinos que revisa cada cuerpo al separarse (incluida ella misma)
+SEPARATION_NEIGHBORS = 8
+
 
 def vitality(w: World, idx: np.ndarray) -> np.ndarray:
     """1 en plenitud; baja linealmente hasta 0 en el último tramo de la vida."""
@@ -24,7 +30,8 @@ def move(w: World) -> None:
         return
     act = w.action[a]
     tgt = w.target[a]
-    vmax = w.vmax[a] * (0.5 + 0.5 * vitality(w, a))  # los viejos van más lento
+    slow = w.cfg.body.old_age_speed                      # los viejos van más lento
+    vmax = w.vmax[a] * (slow + (1 - slow) * vitality(w, a))
     vmax = vmax * w.terrain.speed[w.terrain.cell_of(w.pos[a])]  # bosque, agua, montaña frenan
 
     # Explorar: paseo aleatorio suave (el rumbo cambia un poco cada tick)
@@ -46,7 +53,7 @@ def move(w: World) -> None:
         dist = np.linalg.norm(delta, axis=1)
         safe = np.maximum(dist, 1e-9)[:, None]
         direction[i] = delta / safe
-        speed[i] = np.minimum(vmax[i], dist * 0.5)
+        speed[i] = np.minimum(vmax[i], dist * ARRIVAL_SLOWDOWN)
 
     desired = direction * speed[:, None]
     w.vel[a] += m.steering * (desired - w.vel[a])
@@ -71,7 +78,7 @@ def separate(w: World) -> None:
     pos = w.pos[a]
     rad = w.radius[a] * m.body_footprint   # el cuerpo es más largo que la cabeza
     tree = cKDTree(pos, boxsize=w.size)
-    d, j = tree.query(pos, k=8, distance_upper_bound=2 * rad.max())
+    d, j = tree.query(pos, k=SEPARATION_NEIGHBORS, distance_upper_bound=2 * rad.max())
     valid = (j < len(a)) & (j != np.arange(len(a))[:, None])
     jc = np.where(valid, j, 0)
     min_d = rad[:, None] + rad[jc]

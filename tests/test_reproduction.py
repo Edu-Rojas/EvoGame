@@ -27,6 +27,16 @@ def _full_world_with_a_couple(cfg, free_slots: int):
     return w, ready
 
 
+def test_litter_size_follows_max_litter(cfg):
+    from dataclasses import replace
+
+    from especies.reproduction import litter_size
+    cfg6 = replace(cfg, reproduction=replace(cfg.reproduction, max_litter=6))
+    w = create_world(cfg6, seed=0)
+    assert {litter_size(10.0, 10.0, w) for _ in range(100)} == {6}
+    assert {litter_size(1.0, 1.0, w) for _ in range(100)} == {1}
+
+
 def test_full_world_parents_pay_nothing(small_cfg):
     w, ready = _full_world_with_a_couple(small_cfg, free_slots=0)
     born = reproduce(w, ready)

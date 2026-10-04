@@ -21,7 +21,7 @@ def utilities(w: World, thinkers: np.ndarray, p: Perception, ready: np.ndarray) 
     u = np.zeros((len(thinkers), Action.N))
     u[:, Action.EXPLORE] = b.explore_base
     u[:, Action.EAT] = (p.food != NO_TARGET) * (b.eat_base + hunger)
-    u[:, Action.MATE] = (p.mate != NO_TARGET) * ready[thinkers] * 1.0
+    u[:, Action.MATE] = (p.mate != NO_TARGET) * ready[thinkers] * b.mate_base
     return u * w.instinct[thinkers]
 
 
@@ -48,7 +48,7 @@ def validate_targets(w: World, ready: np.ndarray) -> None:
 
     eating = (act == Action.EAT) & (tgt != NO_TARGET)
     gone = np.zeros(len(a), dtype=bool)
-    gone[eating] = w.terrain.grass[tgt[eating]] < 0.5   # se acabó el pasto
+    gone[eating] = w.terrain.grass[tgt[eating]] < w.cfg.terrain.min_to_stay   # se acabó el pasto
 
     mating = (act == Action.MATE) & (tgt != NO_TARGET)
     t = tgt[mating]

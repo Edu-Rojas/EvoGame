@@ -16,6 +16,7 @@ height = 1000.0       # el mundo es un toro: lo que sale por un borde entra por 
 [terrain]
 cell_size = 20.0            # tamaño de cada celda de terreno (el mapa queda de 80 x 50 celdas)
 noise_scale = 5.0           # tamaño de las manchas de bioma, en celdas (más grande = zonas más grandes)
+temperature_scale = 1.6     # el clima cambia más suave que el relieve: x noise_scale para la temperatura
 # Fracción aproximada del mapa para cada bioma (el resto es pradera):
 water_fraction = 0.06       # lagos chicos: no parten el mapa
 mountain_fraction = 0.10
@@ -24,6 +25,7 @@ desert_fraction = 0.14
 forest_fraction = 0.24
 grass_per_cell = 30.0       # pasto máximo de una celda de pradera (los biomas lo multiplican)
 min_to_target = 3.0         # una celda con menos pasto que esto no vale la pena
+min_to_stay = 0.5           # si la celda objetivo baja de esto mientras va, se rinde y explora
 food_distance_penalty = 0.05  # al elegir dónde pastar: pasto - esto x distancia
 cold_size_exponent = 0.333  # regla de Bergmann: el frío cuesta / tamaño^(1/3)
 
@@ -95,8 +97,11 @@ appetite_base = 0.05       # gasto basal por tick con tamaño 1
 kleiber_exponent = 0.75    # gasto basal proporcional a tamaño^0,75
 base_lifespan = 1800       # vida en ticks (a 10 ticks/s son 3 minutos)
 aging_extra_at_max = 0.6   # tamaño 10 envejece 1,6 veces más rápido
+aging_curve = 1.5          # forma de esa curva: extra x tamaño_normalizado^esto (>1 = solo pesa en los muy grandes)
 senescence_start = 0.7     # desde qué fracción de la vida empieza el deterioro
+old_age_speed = 0.5        # al final de la vida se mueve a esta fracción de su velocidad máxima
 founder_energy = 0.5       # fracción de la reserva con la que arrancan los fundadores
+founder_max_age = 0.3      # los fundadores arrancan con edades al azar hasta esta fracción de la vida
 bite = 4.0                 # energía de pasto que come por tick
 
 [movement]
@@ -114,7 +119,8 @@ body_footprint = 1.5       # radio de "espacio personal" = radio x esto (el cuer
 [detection]
 base_radius = 40.0
 max_multiplier = 3.0         # detección 10 = 3 veces el radio base
-appetite_extra_at_max = 0.25 # detección 10 = +25% de gasto basal (proporcional al área)
+appetite_extra_at_max = 0.25 # detección 10 = +25% de gasto basal
+appetite_curve = 2.0         # forma de ese costo: 2 = proporcional al área que cubre la vista
 k_neighbors = 8              # vecinos que mira cada criatura al pensar
 
 [diet]
@@ -132,6 +138,7 @@ spawn_spread = 6.0           # qué tan lejos de los padres aparecen las crías
 decision_noise = 0.08
 explore_base = 0.3     # utilidad base de explorar
 eat_base = 0.15        # utilidad de comer aunque no tenga hambre
+mate_base = 1.0        # utilidad de aparearse cuando está lista y ve pareja
 instinct_sigma = 0.05  # mutación de los instintos heredables
 instinct_min = 0.2
 instinct_max = 3.0

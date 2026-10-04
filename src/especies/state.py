@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .config import Config
-from .genes import Gene, N_GENES, norm
+from .genes import Gene, N_GENES, mutation_sigmas, norm
 from .geometry import wrap
 from .terrain import Terrain, create_terrain
 
@@ -139,10 +139,11 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
 
     w.terrain = create_terrain(cfg, rng)
 
+    sigmas = mutation_sigmas(cfg.genes.mutation_sigma, cfg.genes.inactive)
     for sp_id, sp in enumerate(cfg.species):
         genes = np.tile(np.array(sp.genes), (sp.count, 1))
         # pequeña variación inicial: sin variación no hay nada que seleccionar
-        genes = np.clip(genes + rng.normal(0, cfg.genes.mutation_sigma, genes.shape), 1, 10)
+        genes = np.clip(genes + rng.normal(0, sigmas, genes.shape), 1, 10)
         spawn(
             w,
             species=np.full(sp.count, sp_id),

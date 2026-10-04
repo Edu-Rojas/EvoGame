@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .genes import GENE_MAX, GENE_MIN, Gene, crossover, mutate, stochastic_round
+from .genes import GENE_MAX, GENE_MIN, Gene, crossover, mutate, mutation_sigmas, stochastic_round
 from .geometry import torus_delta
 from .state import Action, NO_TARGET, World, spawn
 
@@ -55,6 +55,7 @@ def reproduce(w: World, ready: np.ndarray) -> int:
     # Con la capacidad llena, aparearse no puede ser pura pérdida: si no, el tope de
     # rendimiento castigaría a las especies que más se reproducen (y decidiría quién gana).
     free = int((~w.alive).sum())
+    sigmas = mutation_sigmas(cfg.genes.mutation_sigma, cfg.genes.inactive)
     used = np.zeros(len(w.alive), dtype=bool)
     batches: list[dict[str, np.ndarray]] = []
     for i, j, dl in zip(cand[ok], mate[ok], delta[ok]):
@@ -79,8 +80,7 @@ def reproduce(w: World, ready: np.ndarray) -> int:
 
         ga = np.tile(w.genes[i], (n, 1))
         gb = np.tile(w.genes[j], (n, 1))
-        genes = mutate(crossover(ga, gb, w.rng), cfg.genes.mutation_sigma,
-                       GENE_MIN, GENE_MAX, w.rng)
+        genes = mutate(crossover(ga, gb, w.rng), sigmas, GENE_MIN, GENE_MAX, w.rng)
         b = cfg.behavior
         ia = np.tile(w.instinct[i], (n, 1))
         ib = np.tile(w.instinct[j], (n, 1))

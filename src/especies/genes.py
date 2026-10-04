@@ -59,10 +59,27 @@ def crossover(a: np.ndarray, b: np.ndarray, rng: np.random.Generator) -> np.ndar
     return np.where(mask, a, b)
 
 
-def mutate(values: np.ndarray, sigma: float, lo: float, hi: float,
+def mutate(values: np.ndarray, sigma: float | np.ndarray, lo: float, hi: float,
            rng: np.random.Generator) -> np.ndarray:
-    """Ruido gaussiano pequeño, recortado al rango válido."""
+    """Ruido gaussiano pequeño, recortado al rango válido.
+
+    `sigma` puede ser un vector con un valor por columna (por ejemplo, 0 para los
+    genes que no deben mutar).
+    """
     return np.clip(values + rng.normal(0.0, sigma, values.shape), lo, hi)
+
+
+def mutation_sigmas(sigma: float, inactive: tuple[str, ...]) -> np.ndarray:
+    """Sigma de mutación por gen: 0 para los genes que todavía no tienen efecto.
+
+    Un gen sin efecto pegado en 1 solo podría subir (el recorte devuelve a 1 las
+    mutaciones hacia abajo), así que ganaría puntos que nadie repartió.
+    """
+    sigmas = np.full(N_GENES, sigma)
+    for g in Gene:
+        if g.key in inactive:
+            sigmas[g] = 0.0
+    return sigmas
 
 
 def stochastic_round(x: np.ndarray | float, rng: np.random.Generator) -> np.ndarray:

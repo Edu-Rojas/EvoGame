@@ -86,6 +86,7 @@ color_bare = [52, 98, 150]
 [genes]
 budget = 20           # puntos repartibles al crear la especie (todos los genes arrancan en 1)
 mutation_sigma = 0.3  # ruido de la mutación por gen y por nacimiento
+inactive = ["agresividad", "camuflaje"]  # todavía no hacen nada, así que no mutan (1b y 1c)
 
 [body]
 base_radius = 4.0          # radio (de choque y visual) con tamaño 1; crece con la raíz del tamaño
@@ -141,7 +142,7 @@ generation_bonus = 0     # +tope de stats por generación (apagado, v2)
 # ---------------------------------------------------------------------
 # Especies de ejemplo. Genes de 1 a 10; puntos gastados = suma de (gen - 1).
 # En la 1a todos son herbívoros (dieta 1): carnívoros llegan en la 1b.
-# Agresividad y Camuflaje todavía no hacen nada: solo se heredan (deriva neutral).
+# Agresividad y Camuflaje todavía no hacen nada: se heredan pero no mutan ([genes] inactive).
 # ---------------------------------------------------------------------
 [[species]]
 name = "Conejos"

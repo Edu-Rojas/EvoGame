@@ -19,7 +19,7 @@ import numpy as np
 from .config import Config
 from .genes import N_GENES, Gene, mutation_sigmas, norm
 from .geometry import wrap
-from .terrain import Terrain, create_terrain
+from .terrain import Biome, Terrain, create_terrain
 
 
 class Action(IntEnum):
@@ -65,6 +65,7 @@ class World:
     genes: np.ndarray = field(init=False)
     instinct: np.ndarray = field(init=False)
     pos: np.ndarray = field(init=False)
+    home: np.ndarray = field(init=False)         # dónde nació (filopatría)
     vel: np.ndarray = field(init=False)
     heading: np.ndarray = field(init=False)
     energy: np.ndarray = field(init=False)
@@ -180,6 +181,7 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
     w.genes = np.ones((n, N_GENES))
     w.instinct = np.ones((n, N_ACTIONS))
     w.pos = np.zeros((n, 2))
+    w.home = np.zeros((n, 2))
     w.vel = np.zeros((n, 2))
     w.heading = np.zeros(n)
     w.energy = np.zeros(n)
@@ -209,7 +211,7 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
             species=np.full(sp.count, sp_id),
             genes=genes,
             instinct=np.ones((sp.count, N_ACTIONS)),
-            pos=rng.random((sp.count, 2)) * w.size,
+            pos=founder_positions(w, sp.count),
             energy=None,  # se calcula con la reserva
             age=rng.random(sp.count) * cfg.body.base_lifespan * cfg.body.founder_max_age,
             generation=np.zeros(sp.count, dtype=np.int32),
@@ -217,6 +219,21 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
             parent_b=np.full(sp.count, -1),
         )
     return w
+
+
+def founder_positions(w: World, count: int) -> np.ndarray:
+    """Dónde nacen los fundadores de una especie.
+
+    Agrupado: alrededor de una zona propia elegida con la semilla, en una celda que no
+    sea agua. Con fundadores dispersos por todo el mapa, las especies poco numerosas
+    casi nunca encuentran pareja (efecto Allee) y se extinguen antes de empezar.
+    """
+    if w.cfg.sim.founder_spawn == "uniform":
+        return w.rng.random((count, 2)) * w.size
+    t = w.terrain
+    land = np.flatnonzero(t.biome != Biome.WATER)
+    center = t.center_of(np.array([land[w.rng.integers(len(land))]]))[0]
+    return center + w.rng.normal(0.0, w.cfg.sim.founder_spread, (count, 2))
 
 
 def spawn(w: World, *, species, genes, instinct, pos, energy, age, generation,
@@ -244,6 +261,7 @@ def spawn(w: World, *, species, genes, instinct, pos, energy, age, generation,
     w.genes[s] = genes
     w.instinct[s] = np.asarray(instinct)[:k]
     w.pos[s] = wrap(np.asarray(pos)[:k], w.size)
+    w.home[s] = w.pos[s]
     w.vel[s] = 0.0
     w.heading[s] = w.rng.random(k) * 2 * np.pi
     w.age[s] = np.asarray(age)[:k]

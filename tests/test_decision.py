@@ -5,10 +5,23 @@ from especies.perception import Perception
 from especies.state import NO_TARGET, Action
 
 
-def _p(n=1, food=NO_TARGET, mate=NO_TARGET, prey=NO_TARGET, threat=NO_TARGET, level=0.0):
+def _p(n=1, food=NO_TARGET, mate=NO_TARGET, prey=NO_TARGET, threat=NO_TARGET, level=0.0,
+       seen=None):
     full = lambda v, dt=np.int64: np.full(n, v, dtype=dt)  # noqa: E731
-    return Perception(food=full(food), mate=full(mate), prey=full(prey), threat=full(threat),
-                      threat_level=full(level, float))
+    if seen is None:
+        seen = 0 if prey == NO_TARGET else 4
+    return Perception(food=full(food), mate=full(mate), prey=full(prey), prey_seen=full(seen),
+                      threat=full(threat), threat_level=full(level, float))
+
+
+def test_lone_prey_is_less_tempting_than_a_herd(make_world):
+    """Holling tipo III: con una sola presa a la vista, cazar vale menos."""
+    from especies.decision import utilities
+    w = make_world(n=2, energy=[1.0, 50.0], reserve=100.0, instinct=1.0, meat_eff=1.0)
+    ready = _none_ready(w)
+    one = utilities(w, np.array([0]), _p(prey=1, seen=1), ready)[0, Action.HUNT]
+    herd = utilities(w, np.array([0]), _p(prey=1, seen=4), ready)[0, Action.HUNT]
+    assert 0 < one < herd
 
 
 def _none_ready(w):

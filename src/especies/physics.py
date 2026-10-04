@@ -22,6 +22,58 @@ def vitality(w: World, idx: np.ndarray) -> np.ndarray:
     return 1.0 - np.clip(decline, 0.0, 1.0)
 
 
+def _pull_home(w: World, explorers: np.ndarray) -> None:
+    """Filopatría: al explorar lejos de donde nació, el rumbo se tuerce hacia allá.
+
+    Crea poblaciones locales (estructura espacial), lo que por sí solo favorece la
+    coexistencia. Depende solo de la distancia, nunca de la especie.
+    """
+    m = w.cfg.movement
+    if len(explorers) == 0 or m.home_pull <= 0:
+        return
+    to_home = torus_delta(w.pos[explorers], w.home[explorers], w.size)
+    dist = np.linalg.norm(to_home, axis=1)
+    pull = m.home_pull * np.clip((dist - m.home_range) / m.home_range, 0.0, 1.0)
+    far = pull > 0
+    if not far.any():
+        return
+    e = explorers[far]
+    h = np.stack([np.cos(w.heading[e]), np.sin(w.heading[e])], axis=1)
+    home_dir = to_home[far] / dist[far, None]
+    blended = h * (1 - pull[far, None]) + home_dir * pull[far, None]
+    # si la casa quedaba justo detrás, las dos direcciones se anulan: va directo a casa
+    cancel = np.linalg.norm(blended, axis=1) < 1e-6
+    blended[cancel] = home_dir[cancel]
+    w.heading[e] = np.arctan2(blended[:, 1], blended[:, 0])
+
+
+# Celdas que mira una presa al buscar dónde esconderse (radio en celdas; geometría)
+COVER_SEARCH_CELLS = 3
+_COVER_OFFSETS = np.array([(dx, dy) for dx in range(-COVER_SEARCH_CELLS, COVER_SEARCH_CELLS + 1)
+                           for dy in range(-COVER_SEARCH_CELLS, COVER_SEARCH_CELLS + 1)
+                           if 0 < dx * dx + dy * dy <= COVER_SEARCH_CELLS ** 2])
+
+
+def _toward_cover(w: World, fleeing: np.ndarray, away: np.ndarray) -> np.ndarray:
+    """Dirección de huida torcida hacia la celda cercana con más cobertura (menos
+    visibilidad) que no quede hacia la amenaza. Si ya está en la mejor, sigue derecho."""
+    t = w.terrain
+    pull = w.cfg.movement.cover_seek
+    if pull <= 0:
+        return away
+    cx = (w.pos[fleeing, 0] // t.cell_size).astype(np.int64)
+    cy = (w.pos[fleeing, 1] // t.cell_size).astype(np.int64)
+    cells = ((cy[:, None] + _COVER_OFFSETS[:, 1]) % t.gh) * t.gw + (cx[:, None] + _COVER_OFFSETS[:, 0]) % t.gw
+    dirs = _COVER_OFFSETS / np.linalg.norm(_COVER_OFFSETS, axis=1, keepdims=True)
+    ahead = away @ dirs.T > -0.2                      # no correr hacia el depredador
+    vis = np.where(ahead, t.visibility[cells], np.inf)
+    best = vis.argmin(axis=1)
+    here = t.visibility[t.cell_of(w.pos[fleeing])]
+    better = vis[np.arange(len(fleeing)), best] < here
+    blended = away + pull * dirs[best] * better[:, None]
+    return blended / np.maximum(np.linalg.norm(blended, axis=1, keepdims=True), 1e-9)
+
+
 def move(w: World) -> None:
     """Calcula la velocidad deseada según la acción y gira suave hacia ella."""
     m = w.cfg.movement
@@ -37,6 +89,7 @@ def move(w: World) -> None:
     # Explorar: paseo aleatorio suave (el rumbo cambia un poco cada tick)
     explore = act == Action.EXPLORE
     w.heading[a[explore]] += w.rng.normal(0.0, m.wander_turn, explore.sum())
+    _pull_home(w, a[explore])
     direction = np.stack([np.cos(w.heading[a]), np.sin(w.heading[a])], axis=1)
     speed = np.where(explore, m.cruise_fraction * vmax, vmax)
 
@@ -54,10 +107,13 @@ def move(w: World) -> None:
         safe = np.maximum(dist, 1e-9)[:, None]
         direction[i] = delta / safe
         speed[i] = np.minimum(vmax[i], dist * ARRIVAL_SLOWDOWN)
-        # huir: en sentido contrario a la amenaza y a toda velocidad, sin frenar
+        # huir: en sentido contrario a la amenaza y a toda velocidad, sin frenar, y
+        # torciendo hacia la cobertura más cercana (el bosque esconde: refugio)
         flee = act[i] == Action.FLEE
         direction[i[flee]] *= -1.0
         speed[i[flee]] = vmax[i[flee]]
+        if flee.any():
+            direction[i[flee]] = _toward_cover(w, a[i[flee]], direction[i[flee]])
 
     desired = direction * speed[:, None]
     w.vel[a] += m.steering * (desired - w.vel[a])

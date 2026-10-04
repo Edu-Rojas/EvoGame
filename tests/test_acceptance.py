@@ -16,7 +16,9 @@ def test_report_counts_passing_seeds():
 
 
 def test_deaths_are_counted_by_cause(cfg):
-    w = create_world(cfg, seed=2)
+    from dataclasses import replace
+    mixed = replace(cfg, sim=replace(cfg.sim, founder_spawn="uniform"))   # todos mezclados
+    w = create_world(mixed, seed=2)
     run(w, 400)
     assert w.deaths_by_cause.sum() == w.deaths_total
     hunted = dict(zip([s.name for s in cfg.species],

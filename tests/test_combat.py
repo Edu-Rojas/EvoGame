@@ -84,6 +84,21 @@ def test_only_large_creatures_reach_tall_leaves(make_world):
     assert w.energy[0] == 0.0 and w.energy[1] > 0.0
 
 
+def test_large_browser_prefers_full_leaves_over_a_little_grass(make_world):
+    """Regresión: con la misma eficiencia, un poco de pasto recién rebrotado le ganaba
+    a las hojas llenas y los grandes nunca comían hojas."""
+    w = make_world(n=1, energy=0.0, reserve=500.0, radius=3.0, action=Action.EAT,
+                   plant_eff=1.0, meat_eff=0.0, leaf_reach=1.0)
+    forest = np.flatnonzero(w.terrain.leaves_max > 0)[0]
+    w.pos[0] = w.terrain.center_of(np.array([forest]))[0]
+    w.target[0] = forest
+    w.terrain.grass[forest] = 0.05
+    w.terrain.leaves[forest] = 20.0
+    eat(w)
+    assert w.terrain.leaves[forest] < 20.0
+    assert w.energy[0] > 1.0
+
+
 def test_newborns_with_little_energy_are_frail(cfg):
     from especies.state import spawn
     w = create_world(cfg, seed=0)

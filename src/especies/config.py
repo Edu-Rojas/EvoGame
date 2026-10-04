@@ -112,9 +112,13 @@ class BiomeCfg:
 class GenesCfg:
     budget: int
     mutation_sigma: float
+    inactive: tuple[str, ...]   # genes que todavía no tienen efecto: no mutan
 
     def __post_init__(self) -> None:
         _non_negative(self, "budget", "mutation_sigma")
+        object.__setattr__(self, "inactive", tuple(self.inactive))   # inmutable aunque venga lista
+        unknown = set(self.inactive) - {g.key for g in Gene}
+        _require(not unknown, f"inactive tiene genes desconocidos: {sorted(unknown)}")
 
 
 @dataclass(frozen=True)

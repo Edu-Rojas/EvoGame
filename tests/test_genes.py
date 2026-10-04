@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from especies.genes import Gene, crossover, mutate, stochastic_round
+from especies.genes import Gene, crossover, mutate, mutation_sigmas, stochastic_round
 from especies.state import derive_traits
 
 
@@ -19,6 +19,24 @@ def test_mutation_stays_in_range():
     rng = np.random.default_rng(0)
     v = mutate(np.full(10_000, 9.9), sigma=1.0, lo=1, hi=10, rng=rng)
     assert v.min() >= 1 and v.max() <= 10
+
+
+def test_inactive_genes_do_not_mutate():
+    rng = np.random.default_rng(0)
+    sigmas = mutation_sigmas(0.3, ("agresividad", "camuflaje"))
+    v = mutate(np.ones((1000, len(Gene))), sigmas, lo=1, hi=10, rng=rng)
+    assert (v[:, Gene.AGGRESSION] == 1.0).all() and (v[:, Gene.CAMOUFLAGE] == 1.0).all()
+    assert v[:, Gene.SIZE].std() > 0
+
+
+def test_inactive_genes_stay_put_across_generations(cfg):
+    from especies.state import create_world
+    from especies.step import run
+    w = create_world(cfg, seed=3)
+    run(w, 800)
+    a = w.alive & (w.generation > 0)
+    assert a.any()
+    assert (w.genes[a, Gene.AGGRESSION] == 1.0).all()
 
 
 def test_stochastic_round_preserves_mean():

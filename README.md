@@ -75,8 +75,8 @@ tests/             pytest
 
 - Activos: Tamaño, Aceleración (solo velocidad, sin fatiga), Detección, Apareamiento, Dieta
   (todos herbívoros).
-- Agresividad y Camuflaje existen y se heredan, pero todavía no hacen nada: van a derivar
-  al azar (deriva neutral), lo cual es interesante de ver.
+- Agresividad y Camuflaje existen y se heredan, pero todavía no hacen nada, así que no mutan
+  (`[genes] inactive` en la config). Se activan en la 1b y la 1c.
 - En la 1a el Tamaño casi solo tiene costos (su única ventaja todavía es aguantar el frío de
   la helada, por la regla de Bergmann; pelear y cazar llegan en la 1b), así que la selección
   lo empuja hacia abajo y a los grandes les va mal. No es un bug.

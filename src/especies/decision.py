@@ -20,7 +20,8 @@ def utilities(w: World, thinkers: np.ndarray, p: Perception, ready: np.ndarray) 
 
     u = np.zeros((len(thinkers), N_ACTIONS))
     u[:, Action.EXPLORE] = b.explore_base
-    u[:, Action.EAT] = (p.food != NO_TARGET) * (b.eat_base + hunger)
+    # el pasto vale lo que la criatura saca de él: un carnívoro no lo busca
+    u[:, Action.EAT] = (p.food != NO_TARGET) * (b.eat_base + hunger) * w.plant_eff[thinkers]
     u[:, Action.MATE] = (p.mate != NO_TARGET) * ready[thinkers] * b.mate_base
     return u * w.instinct[thinkers]
 

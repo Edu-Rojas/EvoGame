@@ -80,6 +80,10 @@ def separate(w: World) -> None:
         return
     away = torus_delta(pos[jc], pos[:, None, :], w.size)          # del vecino hacia mí
     dist = np.linalg.norm(away, axis=2, keepdims=True)
-    away = np.where(dist > 1e-9, away / np.maximum(dist, 1e-9), np.array([1.0, 0.0]))
+    # Dos cuerpos en el mismo punto no tienen dirección: se empujan en sentidos opuestos
+    # según el índice. Con la misma dirección para ambos, viajarían juntos sin separarse.
+    sign = np.where(np.arange(len(a))[:, None] < jc, 1.0, -1.0)
+    fallback = np.stack([sign, np.zeros_like(sign)], axis=-1)
+    away = np.where(dist > 1e-9, away / np.maximum(dist, 1e-9), fallback)
     push = (away * overlap[..., None]).sum(axis=1) * 0.5 * m.separation_strength
     w.pos[a] = wrap(pos + push, w.size)

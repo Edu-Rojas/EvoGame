@@ -35,11 +35,18 @@ def print_report(w: World, ms_per_tick: float) -> None:
         print(f"{s.name:<11}{s.count:>6}{s.max_generation:>5}{s.mean_energy_frac:>7.0%}  {genes}")
 
 
+def positive_int(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"debe ser un entero >= 1 (recibí {value})")
+    return value
+
+
 def main(argv: list[str] | None = None) -> None:
-    ap = argparse.ArgumentParser(prog="especies-headless", description=__doc__.splitlines()[0])
+    ap = argparse.ArgumentParser(prog="especies-headless", description="Simulación sin gráficos.")
     ap.add_argument("--config", default=None, help="TOML de config (por defecto, el del paquete)")
-    ap.add_argument("--ticks", type=int, default=3000)
-    ap.add_argument("--every", type=int, default=500, help="cada cuántos ticks imprimir")
+    ap.add_argument("--ticks", type=positive_int, default=3000)
+    ap.add_argument("--every", type=positive_int, default=500, help="cada cuántos ticks imprimir")
     ap.add_argument("--seed", type=int, default=None)
     args = ap.parse_args(argv)
 

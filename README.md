@@ -1,15 +1,15 @@
 # Guerra de especies
 
-Ecosistema evolutivo: cada pana crea su especie repartiendo puntos entre genes, y las
+Ecosistema evolutivo: cada jugador crea una especie repartiendo puntos entre genes, y las
 criaturas comen, se aparean con herencia y mutación, envejecen y mueren. Nadie programa
 quién gana: sale de los costos y beneficios de cada gen.
 
-**Etapa actual: 1a** (herbívoros en un mundo con biomas, pasto que rebrota, reproducción sexual,
-visor de desarrollo con animación procedural estilo Rain World).
+**Etapa actual: 1a.** Herbívoros en un mundo con biomas, pasto que rebrota, reproducción
+sexual y un visor de desarrollo en pixel art con animación procedural.
 
 ## Requisitos
 
-- Python 3.11 o más nuevo (usa `tomllib`, que viene con Python desde la 3.11)
+- Python 3.11 o más nuevo (usa `tomllib`)
 
 ## Instalación (Windows)
 
@@ -29,61 +29,71 @@ En Linux o macOS, `source .venv/bin/activate` en vez de la segunda línea.
 | Ver el mundo en vivo | `python -m viewer` |
 | Otra semilla / más rápido | `python -m viewer --seed 7 --tps 40` |
 | Simulación sin gráficos | `especies-headless --ticks 5000 --every 500` |
-| Tests | `pytest` |
+| Tests (todos / rápidos) | `pytest` / `pytest -m "not slow"` |
+| Lint y tipos | `ruff check .` y `mypy` |
 
 Controles del visor:
 
 | Tecla | Acción |
 |---|---|
-| Rueda del mouse | Zoom hacia el cursor (las patas y plumas se ven de cerca) |
+| Rueda del mouse | Zoom hacia el cursor (de cerca se ven patas, garras y branquias) |
 | Clic derecho + arrastrar, o WASD | Mover la cámara |
 | Clic izquierdo | Elegir criatura: ficha (genes, instintos, padres, energía) y radio de detección |
 | F | La cámara sigue a la criatura elegida |
+| P | Tamaño del píxel (2, 3 o 4) |
 | Espacio | Pausa |
 | ↑ / ↓ | Más o menos ticks por segundo |
 | ESC | Salir |
 
 ## Ajustar el balance
 
-Todos los números están en `src/especies/data/default.toml` (viaja dentro del paquete). Para
-experimentar, copia el archivo donde quieras, cámbialo y córrelo con `--config mi_prueba.toml`. Si escribes mal una clave, la
-carga falla con un error claro en vez de ignorarla.
+Todos los números de balance están en `src/especies/data/default.toml`, que viaja dentro
+del paquete. Para experimentar, copia el archivo, cámbialo y córrelo con
+`--config mi_prueba.toml`. Si escribes mal una clave o pones un valor fuera de rango, la
+carga falla con un error que dice la sección y la clave.
 
 ## Estructura
 
 ```
-src/especies/      simulación pura (no sabe que existen los gráficos)
-  config.py        TOML -> dataclasses inmutables, valida claves, rangos y presupuesto de genes
-  data/default.toml todos los números de balance
-  cli.py           especies-headless: simulación sin gráficos con reportes por especie
-  geometry.py      mundo toroidal: wrap y camino más corto
-  genes.py         índices de genes, cruce uniforme, mutación, redondeo al azar
-  state.py         World: criaturas como columnas de arrays + rasgos derivados de genes
-  terrain.py       biomas (pradera, bosque, desierto, montaña, helada, agua) y pasto por celda
-  perception.py    mejor celda de pasto + pareja más cercana (KD-tree en mundo toroidal)
-  decision.py      utilidad por acción = instinto base x instinto heredable
-  physics.py       movimiento, deterioro por vejez, separación de cuerpos
-  metabolism.py    pastar (reparto justo), gasto (Kleiber + ojos + movimiento + bioma), muerte
-  reproduction.py  apareamiento, tamaño de camada, herencia
-  step.py          orden de los sistemas en un tick
-  metrics.py       resúmenes por especie y ficha de criatura
-viewer/            visor pygame (solo lee el estado)
-  animation.py     animación procedural: columna que sigue a la cabeza, patas con IK, plumas
-  app.py           cámara con zoom, terreno, dibujo, interpolación entre ticks
-tests/             pytest
+src/especies/        simulación pura (no sabe que existen los gráficos)
+  config.py          TOML -> dataclasses inmutables; valida claves, rangos y presupuesto
+  data/default.toml  todos los números de balance
+  cli.py             especies-headless: reportes por especie sin gráficos
+  geometry.py        mundo toroidal: wrap y camino más corto
+  genes.py           genes, cruce uniforme, mutación, redondeo al azar
+  state.py           World: criaturas como columnas de arrays + rasgos derivados
+  terrain.py         biomas y pasto por celda
+  perception.py      mejor celda de pasto + pareja más cercana (KD-tree toroidal)
+  decision.py        utilidad por acción = instinto base x instinto heredable
+  physics.py         movimiento, deterioro por vejez, separación de cuerpos
+  metabolism.py      pastar, gasto (Kleiber + ojos + movimiento + bioma), muerte
+  reproduction.py    apareamiento, tamaño de camada, herencia
+  step.py            orden de los sistemas en un tick
+  metrics.py         resúmenes por especie y ficha de criatura (datos crudos)
+viewer/              visor pygame (solo lee el estado)
+  animation.py       rig procedural en numpy: columna, patas con IK, garras, branquias
+  palette.py         tinta, papel y colores por especie
+  render.py          pixel art: terreno con dithering y garabatos, criaturas con LOD
+  app.py             cámara, entrada, interpolación entre ticks y HUD
+tests/               pytest, un archivo por módulo
+docs/adr/            decisiones de arquitectura
 ```
+
+## Documentación
+
+- [CHANGELOG.md](CHANGELOG.md): cambios por versión.
+- [docs/adr/](docs/adr/README.md): por qué el código está hecho así.
 
 ## Qué hay en la 1a y qué falta
 
-- Activos: Tamaño, Aceleración (solo velocidad, sin fatiga), Detección, Apareamiento, Dieta
-  (todos herbívoros).
-- Agresividad y Camuflaje existen y se heredan, pero todavía no hacen nada, así que no mutan
-  (`[genes] inactive` en la config). Se activan en la 1b y la 1c.
-- En la 1a el Tamaño casi solo tiene costos (su única ventaja todavía es aguantar el frío de
-  la helada, por la regla de Bergmann; pelear y cazar llegan en la 1b), así que la selección
-  lo empuja hacia abajo y a los grandes les va mal. No es un bug.
-- Biomas: cambian cuánto pasto crece, la velocidad, cuánto se ve (en el bosque menos) y el
-  gasto de energía. El agua se cruza nadando, lento.
-- Sin stats todavía (Percepción, Ataque...): detectar dentro del radio es seguro.
+- Activos: Tamaño, Aceleración (solo velocidad, sin fatiga), Detección, Apareamiento,
+  Dieta (todos herbívoros).
+- Agresividad y Camuflaje existen y se heredan, pero todavía no hacen nada, así que no
+  mutan (`[genes] inactive` en la config). Se activan en la 1b y la 1c.
+- En la 1a el Tamaño casi solo tiene costos (su única ventaja es aguantar el frío por la
+  regla de Bergmann), así que la selección lo empuja hacia abajo. No es un bug.
+- Con un solo recurso y sin depredadores, la especie que más se reproduce excluye a las
+  demás en una generación (exclusión competitiva). La coexistencia llega con nichos y
+  depredadores.
 - **1b:** carnívoros, cazar, huir, peleas, cadáveres y carroña.
 - **1c:** camuflaje, esconderse/acechar, fatiga de Aceleración.

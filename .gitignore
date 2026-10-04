@@ -23,6 +23,15 @@ htmlcov/
 *.pfx
 secrets/
 *.local.toml
+*credentials*.json
+.envrc
+*.db
+*.sqlite*
+docker-compose.override.yml
+
+# Notas locales de asistentes de código
+.claude/
+CLAUDE.local.md
 
 # Editores y sistema
 .vscode/

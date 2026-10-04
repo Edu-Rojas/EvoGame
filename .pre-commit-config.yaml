@@ -1,0 +1,24 @@
+# Ganchos locales antes de cada commit: `pip install pre-commit && pre-commit install`
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+  - repo: local
+    hooks:
+      # Ningún dato personal al repo: correos de proveedores comunes y rutas locales
+      - id: no-personal-data
+        name: no personal emails or local paths
+        language: pygrep
+        entry: '(?i)[a-z0-9._%+-]+@(gmail|hotmail|outlook|yahoo|icloud)\.|[a-z]:\\users\\'
+        exclude: ^\.pre-commit-config\.yaml$

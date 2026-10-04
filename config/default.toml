@@ -1,0 +1,162 @@
+# =====================================================================
+# Guerra de especies: TODOS los números de balance viven aquí.
+# Cambia valores, re-corre la simulación y compara. No hace falta tocar código.
+# Unidades: distancias en "unidades de mundo", tiempo en ticks.
+# =====================================================================
+
+[sim]
+seed = 42             # -1 = semilla aleatoria (se imprime para poder repetirla)
+capacity = 6000       # tope duro de criaturas vivas a la vez
+think_interval = 3    # cada cuántos ticks decide cada criatura (en la v2 lo pondrá Percepción)
+
+[world]
+width = 1600.0
+height = 1000.0       # el mundo es un toro: lo que sale por un borde entra por el opuesto
+
+[terrain]
+cell_size = 20.0            # tamaño de cada celda de terreno (el mapa queda de 80 x 50 celdas)
+noise_scale = 5.0           # tamaño de las manchas de bioma, en celdas (más grande = zonas más grandes)
+# Fracción aproximada del mapa para cada bioma (el resto es pradera):
+water_fraction = 0.06       # lagos chicos: no parten el mapa
+mountain_fraction = 0.10
+cold_fraction = 0.13
+desert_fraction = 0.14
+forest_fraction = 0.24
+grass_per_cell = 30.0       # pasto máximo de una celda de pradera (los biomas lo multiplican)
+min_to_target = 3.0         # una celda con menos pasto que esto no vale la pena
+food_distance_penalty = 0.05  # al elegir dónde pastar: pasto - esto x distancia
+cold_size_exponent = 0.333  # regla de Bergmann: el frío cuesta / tamaño^(1/3)
+
+# Cada bioma: rebrote por tick, pasto máximo (x grass_per_cell), velocidad,
+# visibilidad (x radio de detección), costo (x gasto de energía) y colores.
+[biomes.pradera]
+regrow = 0.04
+max_grass = 1.0
+speed = 1.0
+visibility = 1.0
+cost = 1.0
+color_lush = [96, 150, 70]
+color_bare = [150, 140, 92]
+
+[biomes.bosque]
+regrow = 0.06
+max_grass = 1.5
+speed = 0.7
+visibility = 0.6
+cost = 1.0
+color_lush = [40, 95, 52]
+color_bare = [78, 86, 56]
+
+[biomes.desierto]
+regrow = 0.006
+max_grass = 0.3
+speed = 1.1
+visibility = 1.3
+cost = 1.15
+color_lush = [214, 192, 128]
+color_bare = [198, 172, 112]
+
+[biomes.montana]
+regrow = 0.015
+max_grass = 0.5
+speed = 0.6
+visibility = 1.25
+cost = 1.3
+color_lush = [126, 124, 118]
+color_bare = [104, 101, 97]
+
+[biomes.helada]
+regrow = 0.01
+max_grass = 0.4
+speed = 0.8
+visibility = 1.0
+cost = 1.6                  # el frío: los grandes pagan menos (Bergmann)
+color_lush = [220, 230, 238]
+color_bare = [188, 198, 210]
+
+[biomes.agua]
+regrow = 0.0
+max_grass = 0.0
+speed = 0.35                # se cruza nadando, lento
+visibility = 1.0
+cost = 1.4
+color_lush = [52, 98, 150]
+color_bare = [52, 98, 150]
+
+[genes]
+budget = 20           # puntos repartibles al crear la especie (todos los genes arrancan en 1)
+mutation_sigma = 0.3  # ruido de la mutación por gen y por nacimiento
+
+[body]
+base_radius = 4.0          # radio (de choque y visual) con tamaño 1; crece con la raíz del tamaño
+reserve_per_size = 60.0    # reserva máxima de energía = esto x tamaño
+appetite_base = 0.05       # gasto basal por tick con tamaño 1
+kleiber_exponent = 0.75    # gasto basal proporcional a tamaño^0,75
+base_lifespan = 1800       # vida en ticks (a 10 ticks/s son 3 minutos)
+aging_extra_at_max = 0.6   # tamaño 10 envejece 1,6 veces más rápido
+senescence_start = 0.7     # desde qué fracción de la vida empieza el deterioro
+founder_energy = 0.5       # fracción de la reserva con la que arrancan los fundadores
+bite = 4.0                 # energía de pasto que come por tick
+
+[movement]
+base_speed = 2.0           # velocidad máxima con aceleración 1
+accel_speed_bonus = 1.0    # aceleración 10 = +100% de velocidad máxima
+steering = 0.25            # qué tan rápido corrige hacia la dirección deseada (0..1)
+cruise_fraction = 0.5      # al explorar va a esta fracción de su velocidad máxima
+wander_turn = 0.35         # ruido de giro al explorar (radianes por tick)
+move_cost = 0.03           # gasto extra por moverse, escala con tamaño^0,75 y (velocidad/base)^2
+veil_drag = 0.1            # apareamiento 10 = 10% más lento (las plumas largas frenan)
+contact_distance = 2.0     # distancia extra al radio para comer o aparearse
+separation_strength = 0.8  # qué tan fuerte se empujan dos cuerpos que se pisan (0 = se atraviesan)
+body_footprint = 1.5       # radio de "espacio personal" = radio x esto (el cuerpo es largo)
+
+[detection]
+base_radius = 40.0
+max_multiplier = 3.0         # detección 10 = 3 veces el radio base
+appetite_extra_at_max = 0.25 # detección 10 = +25% de gasto basal (proporcional al área)
+k_neighbors = 8              # vecinos que mira cada criatura al pensar
+
+[diet]
+exponent = 1.5   # >1 castiga a los omnívoros, <1 los favorece, 1 es neutro
+
+[reproduction]
+maturity_fraction = 0.15     # fracción de la vida para ser adulto
+ready_energy_fraction = 0.6  # energía mínima (fracción de la reserva) para aparearse
+contribution = 0.3           # fracción de su energía que aporta cada padre a la camada
+max_litter = 4
+cooldown = 80                # ticks de espera entre apareamientos (igual para todos)
+spawn_spread = 6.0           # qué tan lejos de los padres aparecen las crías
+
+[behavior]
+decision_noise = 0.08
+explore_base = 0.3     # utilidad base de explorar
+eat_base = 0.15        # utilidad de comer aunque no tenga hambre
+instinct_sigma = 0.05  # mutación de los instintos heredables
+instinct_min = 0.2
+instinct_max = 3.0
+
+[stats]
+generation_bonus = 0     # +tope de stats por generación (apagado, v2)
+
+# ---------------------------------------------------------------------
+# Especies de ejemplo. Genes de 1 a 10; puntos gastados = suma de (gen - 1).
+# En la 1a todos son herbívoros (dieta 1): carnívoros llegan en la 1b.
+# Agresividad y Camuflaje todavía no hacen nada: solo se heredan (deriva neutral).
+# ---------------------------------------------------------------------
+[[species]]
+name = "Conejos"
+color = [120, 220, 140]
+count = 80
+genes = { tamano = 2, aceleracion = 4, agresividad = 1, dieta = 1, camuflaje = 1, deteccion = 4, apareamiento = 9 }
+
+[[species]]
+name = "Elefantes"
+color = [120, 170, 255]
+count = 50
+genes = { tamano = 9, aceleracion = 2, agresividad = 1, dieta = 1, camuflaje = 1, deteccion = 5, apareamiento = 1 }
+
+[[species]]
+name = "Ojones"
+color = [255, 170, 90]
+count = 60
+genes = { tamano = 4, aceleracion = 3, agresividad = 1, dieta = 1, camuflaje = 1, deteccion = 9, apareamiento = 3 }

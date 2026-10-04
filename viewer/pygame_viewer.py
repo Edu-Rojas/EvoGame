@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from especies.config import load_config  # noqa: E402
 from especies.genes import Gene, norm  # noqa: E402
 from especies.metrics import describe_creature  # noqa: E402
-from especies.physics import torus_delta, wrap  # noqa: E402
+from especies.geometry import torus_delta, wrap  # noqa: E402
 from especies.state import create_world  # noqa: E402
 from especies.step import step  # noqa: E402
 from especies.terrain import Biome  # noqa: E402

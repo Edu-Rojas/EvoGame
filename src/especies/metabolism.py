@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from .genes import Gene
-from .physics import torus_delta
+from .geometry import torus_delta
 from .state import Action, NO_TARGET, World
 from .terrain import Biome
 

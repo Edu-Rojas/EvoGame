@@ -1,26 +1,11 @@
-"""Geometría del mundo toroidal, movimiento y separación de cuerpos."""
+"""Movimiento, deterioro por vejez y separación de cuerpos."""
 from __future__ import annotations
 
 import numpy as np
 from scipy.spatial import cKDTree
 
+from .geometry import torus_delta, wrap
 from .state import Action, NO_TARGET, World
-
-
-def wrap(pos: np.ndarray, size: np.ndarray) -> np.ndarray:
-    """Mete posiciones dentro de [0, size). Lo que sale por un borde entra por el otro.
-
-    El np.where cubre un caso feo de punto flotante: np.mod(-1e-17, 1600) puede dar
-    exactamente 1600.0, y el KD-tree con boxsize rechaza puntos == boxsize.
-    """
-    p = np.mod(pos, size)
-    return np.where(p >= size, 0.0, p)
-
-
-def torus_delta(frm: np.ndarray, to: np.ndarray, size: np.ndarray) -> np.ndarray:
-    """Vector más corto de `frm` a `to` en un toro (puede cruzar el borde)."""
-    d = to - frm
-    return d - size * np.round(d / size)
 
 
 def vitality(w: World, idx: np.ndarray) -> np.ndarray:

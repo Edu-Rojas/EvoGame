@@ -49,7 +49,7 @@ def _fraction(obj: object, *names: str) -> None:
 
 
 def _color(name: str, c: tuple[int, ...]) -> None:
-    _require(len(c) == 3 and all(0 <= v <= 255 for v in c),
+    _require(len(c) == 3 and all(isinstance(v, int) and 0 <= v <= 255 for v in c),
              f"{name}={list(c)} debe ser [r, g, b] con valores de 0 a 255")
 
 
@@ -280,9 +280,22 @@ def _check_keys(data: Mapping[str, Any], expected: set[str], section: str) -> No
         raise ValueError(f"[{section}] faltan claves: {sorted(missing)}")
 
 
+def _check_types(cls: type, data: Mapping[str, Any], section: str) -> None:
+    """Enteros donde van enteros y números donde van números (TOML distingue 3 de 3.0;
+    un 6000.5 en `capacity` no debe pasar ni truncarse en silencio)."""
+    for f in fields(cls):
+        v = data[f.name]
+        if f.type == "int" and (not isinstance(v, int) or isinstance(v, bool)):
+            raise ValueError(f"[{section}] {f.name}={v!r} debe ser un número entero")
+        if f.type == "float" and (not isinstance(v, int | float) or isinstance(v, bool)):
+            raise ValueError(f"[{section}] {f.name}={v!r} debe ser un número")
+
+
 def _build(cls: type, data: dict[str, Any], section: str):
-    """Construye una dataclass exigiendo exactamente las claves esperadas y rangos válidos."""
+    """Construye una dataclass exigiendo exactamente las claves esperadas, sus tipos y
+    rangos válidos."""
     _check_keys(data, {f.name for f in fields(cls)}, section)
+    _check_types(cls, data, section)
     try:
         return cls(**data)
     except ValueError as e:
@@ -292,10 +305,17 @@ def _build(cls: type, data: dict[str, Any], section: str):
 def _build_species(raw: dict[str, Any], budget: int) -> SpeciesCfg:
     name = raw.get("name", "?")
     _check_keys(raw, SPECIES_KEYS, f"species {name}")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(f"Especie {name!r}: el nombre debe ser un texto no vacío")
+    if not isinstance(raw["count"], int) or isinstance(raw["count"], bool):
+        raise ValueError(f"Especie {name}: count={raw['count']!r} debe ser un número entero")
     genes_raw = raw["genes"]
     unknown = set(genes_raw) - {g.key for g in Gene}
     if unknown:
         raise ValueError(f"Especie {name}: genes desconocidos {sorted(unknown)}")
+    bad = [k for k, v in genes_raw.items() if not isinstance(v, int | float) or isinstance(v, bool)]
+    if bad:
+        raise ValueError(f"Especie {name}: los genes {sorted(bad)} deben ser números")
     values = tuple(float(genes_raw.get(g.key, GENE_MIN)) for g in Gene)
     for g, v in zip(Gene, values, strict=True):
         if not GENE_MIN <= v <= GENE_MAX:
@@ -304,8 +324,7 @@ def _build_species(raw: dict[str, Any], budget: int) -> SpeciesCfg:
     if spent > budget + 1e-9:
         raise ValueError(f"Especie {name}: gasta {spent:g} puntos y el presupuesto es {budget}")
     try:
-        return SpeciesCfg(name=name, color=tuple(raw["color"]), count=int(raw["count"]),
-                          genes=values)
+        return SpeciesCfg(name=name, color=tuple(raw["color"]), count=raw["count"], genes=values)
     except ValueError as e:
         raise ValueError(f"Especie {name}: {e}") from None
 
@@ -325,6 +344,10 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
     species = tuple(_build_species(s, budget) for s in raw["species"])
     if not species:
         raise ValueError("La config no define ninguna [[species]]")
+    names = [s.name for s in species]
+    dupes = sorted({n for n in names if names.count(n) > 1})
+    if dupes:
+        raise ValueError(f"Nombres de especie repetidos: {dupes}")
     cfg = Config(**built, biomes=_build_biomes(raw["biomes"]), species=species)
     _check_cross_sections(cfg)
     return cfg

@@ -107,6 +107,7 @@ class Viewer:
         self.font_bold = pygame.font.SysFont("consolas,menlo,monospace", 15, bold=True)
         self.clock = pygame.time.Clock()
         self.rig = Rig(cfg.sim.capacity, world.size)
+        self.on_screen = np.zeros(cfg.sim.capacity, dtype=bool)
         self.maturity = cfg.reproduction.maturity_fraction * cfg.body.base_lifespan
         # rng propio del visor: si usara el de la simulación, abrir el visor cambiaría
         # la simulación (y rompería la semilla)
@@ -201,26 +202,31 @@ class Viewer:
         a = w.alive_idx()
         if len(a) == 0:
             return
-        g = w.genes[a]
-        x_acc = norm(g[:, Gene.ACCELERATION])
         radius = w.radius[a] * growth(w.age[a], self.maturity)
         heads = self.interpolated_heads(a)
-
-        self.rig.sync(a, w.uid[a], heads, w.heading[a], radius, x_acc)
-        self.rig.update(a, heads, radius, x_acc, 0.0 if self.paused else dt)
 
         # Cámara: base = dónde cae la cabeza respecto al centro; el resto del rig se
         # dibuja relativo a la cabeza (así nada salta al cruzar el borde del toro)
         base = cam.rel(heads)
         reach = radius * 6
         visible = np.all(np.abs(base) < cam.half_extent + reach[:, None], axis=1)
-        if not visible.any():
+        a, base, radius, heads = a[visible], base[visible], radius[visible], heads[visible]
+        # El rig solo se anima en pantalla: el que entra a la vista recibe un rig nuevo
+        # (el viejo quedó congelado donde salió)
+        entering = ~self.on_screen[a]
+        self.rig.uid[a[entering]] = -1
+        self.on_screen[:] = False
+        self.on_screen[a] = True
+        if len(a) == 0:
             return
-        a, base, radius, g = a[visible], base[visible], radius[visible], g[visible]
+        g = w.genes[a]
+        x_acc = norm(g[:, Gene.ACCELERATION])
+        self.rig.sync(a, w.uid[a], heads, w.heading[a], radius, x_acc)
+        self.rig.update(a, heads, radius, x_acc, 0.0 if self.paused else dt)
         self.creature_view.draw(
             self.canvas, self.shadow, self.view(), self.rig, a, w.species[a], base, radius,
             energy_frac=w.energy[a] / w.reserve[a],
-            x_acc=norm(g[:, Gene.ACCELERATION]), x_det=norm(g[:, Gene.DETECTION]),
+            x_acc=x_acc, x_det=norm(g[:, Gene.DETECTION]),
             x_mate=norm(g[:, Gene.MATING]), time=self.time)
 
     # ---------- dibujo general ----------

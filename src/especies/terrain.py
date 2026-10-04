@@ -83,7 +83,7 @@ def generate_biomes(rng: np.random.Generator, gh: int, gw: int, t) -> np.ndarray
     """Clasifica cada celda según elevación, humedad y temperatura."""
     elev = _smooth_field(rng, (gh, gw), t.noise_scale)
     moist = _smooth_field(rng, (gh, gw), t.noise_scale)
-    temp = _smooth_field(rng, (gh, gw), t.noise_scale * 1.6)  # el clima cambia más suave
+    temp = _smooth_field(rng, (gh, gw), t.noise_scale * t.temperature_scale)  # clima más suave
 
     b = np.full((gh, gw), Biome.GRASSLAND, dtype=np.int8)
     b[moist > 1 - t.forest_fraction] = Biome.FOREST

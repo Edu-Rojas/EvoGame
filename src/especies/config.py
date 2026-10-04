@@ -80,17 +80,19 @@ class TerrainCfg:
     cold_fraction: float
     desert_fraction: float
     forest_fraction: float
+    temperature_scale: float
     grass_per_cell: float
     min_to_target: float
+    min_to_stay: float
     food_distance_penalty: float
     cold_size_exponent: float
 
     def __post_init__(self) -> None:
-        _positive(self, "cell_size", "noise_scale")
+        _positive(self, "cell_size", "noise_scale", "temperature_scale")
         _fraction(self, "water_fraction", "mountain_fraction", "cold_fraction",
                   "desert_fraction", "forest_fraction")
-        _non_negative(self, "grass_per_cell", "min_to_target", "food_distance_penalty",
-                      "cold_size_exponent")
+        _non_negative(self, "grass_per_cell", "min_to_target", "min_to_stay",
+                      "food_distance_penalty", "cold_size_exponent")
 
 
 @dataclass(frozen=True)
@@ -131,14 +133,18 @@ class BodyCfg:
     kleiber_exponent: float
     base_lifespan: int
     aging_extra_at_max: float
+    aging_curve: float
     senescence_start: float
+    old_age_speed: float
     founder_energy: float
+    founder_max_age: float
     bite: float
 
     def __post_init__(self) -> None:
-        _positive(self, "base_radius", "reserve_per_size", "base_lifespan", "bite")
+        _positive(self, "base_radius", "reserve_per_size", "base_lifespan", "bite",
+                  "aging_curve")
         _non_negative(self, "appetite_base", "kleiber_exponent", "aging_extra_at_max")
-        _fraction(self, "founder_energy")
+        _fraction(self, "founder_energy", "founder_max_age", "old_age_speed")
         # vitality() divide por (1 - senescence_start)
         _require(0.0 <= self.senescence_start < 1.0,
                  f"senescence_start={self.senescence_start} debe estar en [0, 1)")
@@ -171,10 +177,11 @@ class DetectionCfg:
     base_radius: float
     max_multiplier: float
     appetite_extra_at_max: float
+    appetite_curve: float
     k_neighbors: int
 
     def __post_init__(self) -> None:
-        _positive(self, "base_radius", "k_neighbors")
+        _positive(self, "base_radius", "k_neighbors", "appetite_curve")
         _non_negative(self, "appetite_extra_at_max")
         _require(self.max_multiplier >= 1,
                  f"max_multiplier={self.max_multiplier} debe ser >= 1")
@@ -208,12 +215,14 @@ class BehaviorCfg:
     decision_noise: float
     explore_base: float
     eat_base: float
+    mate_base: float
     instinct_sigma: float
     instinct_min: float
     instinct_max: float
 
     def __post_init__(self) -> None:
-        _non_negative(self, "decision_noise", "explore_base", "eat_base", "instinct_sigma")
+        _non_negative(self, "decision_noise", "explore_base", "eat_base", "mate_base",
+                      "instinct_sigma")
         _positive(self, "instinct_min")
         _require(self.instinct_min <= self.instinct_max,
                  f"instinct_min={self.instinct_min} es mayor que instinct_max={self.instinct_max}")

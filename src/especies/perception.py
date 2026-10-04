@@ -34,7 +34,7 @@ def _first_valid(ok: np.ndarray, candidates: np.ndarray) -> np.ndarray:
 def perceive(w: World, thinkers: np.ndarray, ready: np.ndarray, tree: cKDTree,
              tree_slots: np.ndarray) -> Perception:
     cfg = w.cfg
-    k = max(2, cfg.detection.k_neighbors)
+    k = cfg.detection.k_neighbors   # la config garantiza k >= 1
     pos = w.pos[thinkers]
     # El bioma donde está el que mira cambia cuánto ve (en el bosque se ve menos)
     vis = w.terrain.visibility[w.terrain.cell_of(pos)]

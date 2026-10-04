@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from .genes import GENE_MAX, GENE_MIN, Gene, crossover, mutate, mutation_sigmas, stochastic_round
+from .genes import (GENE_MAX, GENE_MIN, Gene, crossover, mutate, mutation_sigmas, norm,
+                    stochastic_round)
 from .geometry import torus_delta
 from .state import Action, NO_TARGET, World, spawn
 
@@ -29,10 +30,11 @@ def litter_size(gene_a: float, gene_b: float, w: World) -> int:
     Ojo: esto NO es herencia (los genes de la cría no se promedian). Es solo la
     decisión de cuántas crías tiene esta camada.
     """
+    max_litter = w.cfg.reproduction.max_litter
     avg = (gene_a + gene_b) / 2
-    expected = 1 + (avg - 1) / 3            # gen 1 -> 1 cría, gen 10 -> 4
+    expected = 1 + (max_litter - 1) * norm(avg)   # gen 1 -> 1 cría, gen 10 -> max_litter
     n = int(stochastic_round(expected, w.rng))
-    return int(np.clip(n, 1, w.cfg.reproduction.max_litter))
+    return int(np.clip(n, 1, max_litter))
 
 
 def reproduce(w: World, ready: np.ndarray) -> int:

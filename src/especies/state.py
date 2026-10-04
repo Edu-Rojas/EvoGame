@@ -101,9 +101,9 @@ def derive_traits(genes: np.ndarray, cfg: Config) -> dict[str, np.ndarray]:
         "vmax": m.base_speed * (1 + m.accel_speed_bonus * x_acc) * (1 - m.veil_drag * x_mate),
         "det_radius": d.base_radius * (1 + (d.max_multiplier - 1) * x_det),
         # Kleiber + costo de los ojos (proporcional al área que cubre: radio^2)
-        "appetite": b.appetite_base * kleiber * (1 + d.appetite_extra_at_max * x_det ** 2),
+        "appetite": b.appetite_base * kleiber * (1 + d.appetite_extra_at_max * x_det ** d.appetite_curve),
         # los grandes envejecen más rápido: x1 / x1,18 / x1,6 para tamaño 1 / 5 / 10
-        "aging_rate": 1 + b.aging_extra_at_max * x_size ** 1.5,
+        "aging_rate": 1 + b.aging_extra_at_max * x_size ** b.aging_curve,
         "plant_eff": (1 - x_diet) ** cfg.diet.exponent,
     }
 
@@ -151,7 +151,7 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
             instinct=np.ones((sp.count, Action.N)),
             pos=rng.random((sp.count, 2)) * w.size,
             energy=None,  # se calcula con la reserva
-            age=rng.random(sp.count) * cfg.body.base_lifespan * 0.3,  # edades mezcladas
+            age=rng.random(sp.count) * cfg.body.base_lifespan * cfg.body.founder_max_age,
             generation=np.zeros(sp.count, dtype=np.int32),
             parent_a=np.full(sp.count, -1),
             parent_b=np.full(sp.count, -1),

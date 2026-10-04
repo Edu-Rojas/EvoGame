@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from especies.genes import Gene
-from especies.metabolism import eat
 from especies.geometry import torus_delta, wrap
+from especies.metabolism import eat
 from especies.reproduction import litter_size
 from especies.state import Action, create_world
 from especies.step import run

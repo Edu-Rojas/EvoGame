@@ -263,8 +263,9 @@ class Viewer:
         y = pos[1] + pad
         for j, (text, color) in enumerate(lines):
             x = pos[0] + pad
-            if chips and chips[j] is not None:
-                pygame.draw.rect(self.screen, chips[j], (x, y + 3, 11, 11))
+            chip = chips[j] if chips else None
+            if chip is not None:
+                pygame.draw.rect(self.screen, chip, (x, y + 3, 11, 11))
                 pygame.draw.rect(self.screen, pal.INK, (x, y + 3, 11, 11), 1)
                 x += 18
             font = self.font_bold if j == 0 else self.font

@@ -5,6 +5,7 @@ Controles:
     clic derecho + arrastrar, o WASD   mover la cámara
     clic izquierdo      seleccionar criatura (ficha + radio de detección)
     F                   la cámara sigue a la criatura seleccionada
+    P                   tamaño del píxel (2, 3 o 4)
     ESPACIO             pausa / continúa
     ↑ / ↓               más o menos ticks por segundo
     ESC                 salir
@@ -24,17 +25,19 @@ from especies.config import load_config
 from especies.genes import Gene, norm
 from especies.geometry import torus_delta, wrap
 from especies.metrics import describe_creature
-from especies.state import create_world
+from especies.state import World, create_world
 from especies.step import step
 from especies.terrain import Biome
 
+from . import palette as pal
 from .animation import Rig
-from .shapes import dim, growth, lighten
+from .render import CreatureRenderer, TerrainRenderer, View
+from .shapes import growth
 
-TXT = (240, 244, 248)
-SHADOW = (20, 22, 26)
 MAX_SCREEN = np.array([1400.0, 860.0])
 MAX_ZOOM = 12.0
+PIXEL_SIZES = (2, 3, 4)
+MAX_TICKS_PER_FRAME = 50
 # Etiquetas de la ficha de criatura en el HUD (la simulación devuelve claves neutras)
 CREATURE_LABELS = {
     "uid": "uid", "species": "especie", "generation": "generacion", "parents": "padres",
@@ -49,7 +52,7 @@ class Camera:
     def __init__(self, world_size: np.ndarray):
         self.size = world_size
         self.min_zoom = float(min(MAX_SCREEN / world_size))
-        self.screen = world_size * self.min_zoom
+        self.screen = np.floor(world_size * self.min_zoom)
         self.zoom = self.min_zoom
         self.center = world_size / 2
 
@@ -74,7 +77,7 @@ class Camera:
 
 
 class Viewer:
-    def __init__(self, world, tps: float):
+    def __init__(self, world: World, tps: float):
         self.w = world
         self.tps = tps
         self.paused = False
@@ -87,55 +90,28 @@ class Viewer:
         cfg = world.cfg
         self.cam = Camera(world.size)
         self.screen = pygame.display.set_mode(tuple(int(v) for v in self.cam.screen))
-        pygame.display.set_caption("Guerra de especies · etapa 1a")
+        pygame.display.set_caption("Guerra de especies")
         self.font = pygame.font.SysFont("consolas,menlo,monospace", 15)
+        self.font_bold = pygame.font.SysFont("consolas,menlo,monospace", 15, bold=True)
         self.clock = pygame.time.Clock()
         self.rig = Rig(cfg.sim.capacity, world.size)
         self.maturity = cfg.reproduction.maturity_fraction * cfg.body.base_lifespan
-        self._prepare_terrain_colors()
+        # rng propio del visor: si usara el de la simulación, abrir el visor cambiaría
+        # la simulación (y rompería la semilla)
+        self.terrain_view = TerrainRenderer(world, np.random.default_rng(0))
+        self.creature_view = CreatureRenderer([sp.color for sp in cfg.species])
+        self.set_pixel(3)
 
-    # ---------- terreno ----------
-    def _prepare_terrain_colors(self) -> None:
-        t, cfg = self.w.terrain, self.w.cfg
-        lush = np.array([cfg.biomes[b.key].color_lush for b in Biome], float)[t.biome]
-        bare = np.array([cfg.biomes[b.key].color_bare for b in Biome], float)[t.biome]
-        # variación fija por celda para que no se vea plano. rng propio: si usara el de
-        # la simulación, abrir el visor cambiaría la simulación (y rompería la semilla)
-        texture = np.random.default_rng(0).normal(0, 5, (len(t.biome), 1))
-        self.lush, self.bare = lush + texture, bare + texture
+    def set_pixel(self, size: int) -> None:
+        self.pixel = size
+        canvas = tuple(int(np.ceil(v / size)) for v in self.cam.screen)
+        self.canvas = pygame.Surface(canvas)
+        self.shadow = pygame.Surface(canvas, pygame.SRCALPHA)
 
-    def _terrain_rgb(self) -> np.ndarray:
-        t = self.w.terrain
-        frac = np.divide(t.grass, t.grass_max, out=np.ones_like(t.grass), where=t.grass_max > 0)
-        rgb = self.bare + (self.lush - self.bare) * frac[:, None]
-        return np.clip(rgb, 0, 255).astype(np.uint8).reshape(t.gh, t.gw, 3)
-
-    def draw_terrain(self) -> None:
-        t, cam = self.w.terrain, self.cam
-        rgb = self._terrain_rgb()
-        cs, z = t.cell_size, cam.zoom
-        world_px = self.w.size * z
-        if world_px[0] <= 2.2 * cam.screen[0]:
-            # Lejos: una imagen chica del mapa escalada y repetida (el mundo es un toro)
-            surf = pygame.surfarray.make_surface(rgb.transpose(1, 0, 2))
-            surf = pygame.transform.scale(surf, (int(world_px[0]) + 1, int(world_px[1]) + 1))
-            origin = cam.screen / 2 - cam.center * z
-            ox, oy = origin % world_px
-            for dx in (-1, 0, 1):
-                for dy in (-1, 0, 1):
-                    self.screen.blit(surf, (ox + dx * world_px[0], oy + dy * world_px[1]))
-            return
-        # Cerca: solo las celdas visibles, como rectángulos
-        half = cam.half_extent
-        x0, x1 = int(np.floor((cam.center[0] - half[0]) / cs)), int(np.ceil((cam.center[0] + half[0]) / cs))
-        y0, y1 = int(np.floor((cam.center[1] - half[1]) / cs)), int(np.ceil((cam.center[1] + half[1]) / cs))
-        side = int(np.ceil(cs * z)) + 1
-        for iy in range(y0, y1 + 1):
-            sy = (iy * cs - cam.center[1]) * z + cam.screen[1] / 2
-            row = rgb[iy % t.gh]
-            for ix in range(x0, x1 + 1):
-                sx = (ix * cs - cam.center[0]) * z + cam.screen[0] / 2
-                pygame.draw.rect(self.screen, tuple(int(c) for c in row[ix % t.gw]), (sx, sy, side, side))
+    def view(self) -> View:
+        return View(center=self.cam.center, zoom=self.cam.zoom / self.pixel,
+                    canvas_center=self.cam.screen / 2 / self.pixel,
+                    canvas_size=self.canvas.get_size())
 
     # ---------- entrada ----------
     def handle(self, ev) -> bool:
@@ -154,6 +130,9 @@ class Viewer:
                 self.tps = max(self.tps / 1.5, 1)
             elif ev.key == pygame.K_f:
                 self.follow = not self.follow
+            elif ev.key == pygame.K_p:
+                i = PIXEL_SIZES.index(self.pixel)
+                self.set_pixel(PIXEL_SIZES[(i + 1) % len(PIXEL_SIZES)])
         elif ev.type == pygame.MOUSEWHEEL:
             self.cam.zoom_at(pygame.mouse.get_pos(), 1.15 ** ev.y)
         elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
@@ -186,7 +165,7 @@ class Viewer:
         if self.paused:
             return
         self.acc += dt * self.tps
-        n = min(int(self.acc), 50)  # tope por frame para no congelar la ventana
+        n = min(int(self.acc), MAX_TICKS_PER_FRAME)  # tope por frame para no congelar la ventana
         self.acc -= n
         # Si la simulación no da abasto, se descarta el atraso: si no, al bajar la
         # velocidad seguiría corriendo 50 ticks por frame hasta vaciarlo
@@ -211,67 +190,29 @@ class Viewer:
         if len(a) == 0:
             return
         g = w.genes[a]
-        x_acc, x_det, x_mate = norm(g[:, Gene.ACCELERATION]), norm(g[:, Gene.DETECTION]), norm(g[:, Gene.MATING])
+        x_acc = norm(g[:, Gene.ACCELERATION])
         radius = w.radius[a] * growth(w.age[a], self.maturity)
         heads = self.interpolated_heads(a)
 
         self.rig.sync(a, w.uid[a], heads, w.heading[a], radius, x_acc)
         self.rig.update(a, heads, radius, x_acc, 0.0 if self.paused else dt)
 
-        # Cámara: base = dónde cae la cabeza en pantalla; el resto del rig se dibuja
-        # relativo a la cabeza (así nada salta al cruzar el borde del toro)
+        # Cámara: base = dónde cae la cabeza respecto al centro; el resto del rig se
+        # dibuja relativo a la cabeza (así nada salta al cruzar el borde del toro)
         base = cam.rel(heads)
         reach = radius * 6
         visible = np.all(np.abs(base) < cam.half_extent + reach[:, None], axis=1)
         if not visible.any():
             return
-        a, base, radius = a[visible], base[visible], radius[visible]
-        x_acc, x_det, x_mate = x_acc[visible], x_det[visible], x_mate[visible]
-        head_cont = self.rig.spine[a, 0]
-        z, center = cam.zoom, cam.screen / 2
-
-        def to_screen(pts: np.ndarray) -> np.ndarray:
-            shape = (len(a),) + (1,) * (pts.ndim - 2) + (2,)
-            return (base.reshape(shape) + pts - head_cont.reshape(shape)) * z + center
-
-        energy_k = 0.5 + 0.5 * np.minimum(w.energy[a] / w.reserve[a], 1.0)
-        px_radius = radius * z
-        detailed = px_radius >= 2.2
-
-        # Lejos: un punto de color por criatura (rápido)
-        for i in np.flatnonzero(~detailed):
-            color = w.cfg.species[w.species[a[i]]].color
-            pygame.draw.circle(self.screen, color, base[i] * z + center, max(1.5, px_radius[i]))
-
-        d = np.flatnonzero(detailed)
-        if len(d) == 0:
-            return
-        outline = to_screen(self.rig.outline(a, radius))
-        hip, knee, foot = (to_screen(p) for p in self.rig.legs(a, radius, x_acc))
-        plumes = to_screen(self.rig.plumes(a, radius, x_mate, self.time))
-        eye_l, eye_r, eye_r_world = self.rig.eyes(a, radius, x_det)
-        eye_l, eye_r = to_screen(eye_l[:, None])[:, 0], to_screen(eye_r[:, None])[:, 0]
-
-        for i in d:
-            color = w.cfg.species[w.species[a[i]]].color
-            body = dim(color, energy_k[i])
-            dark = dim(color, 0.35)
-            limbs = px_radius[i] >= 4.0   # patas y plumas solo si se alcanzan a ver
-            if limbs and x_mate[i] > 0.05:
-                for p in plumes[i]:
-                    pygame.draw.lines(self.screen, lighten(color, 0.3), False, p, max(1, int(px_radius[i] * 0.35)))
-            leg_w = max(1, int(px_radius[i] * 0.3))
-            for k in range(4 if limbs else 0):
-                pygame.draw.lines(self.screen, dark, False, (hip[i, k], knee[i, k], foot[i, k]), leg_w)
-            pygame.draw.polygon(self.screen, body, outline[i])
-            pygame.draw.polygon(self.screen, SHADOW, outline[i], 1)
-            er = max(1.0, eye_r_world[i] * z)
-            for e in (eye_l[i], eye_r[i]):
-                pygame.draw.circle(self.screen, (245, 245, 240), e, er)
-                pygame.draw.circle(self.screen, SHADOW, e, er * 0.45)
+        a, base, radius, g = a[visible], base[visible], radius[visible], g[visible]
+        self.creature_view.draw(
+            self.canvas, self.shadow, self.view(), self.rig, a, w.species[a], base, radius,
+            energy_frac=w.energy[a] / w.reserve[a],
+            x_acc=norm(g[:, Gene.ACCELERATION]), x_det=norm(g[:, Gene.DETECTION]),
+            x_mate=norm(g[:, Gene.MATING]), time=self.time)
 
     # ---------- dibujo general ----------
-    def selected_slot(self):
+    def selected_slot(self) -> int | None:
         if self.selected_uid < 0:
             return None
         hit = np.flatnonzero(self.w.alive & (self.w.uid == self.selected_uid))
@@ -285,39 +226,74 @@ class Viewer:
         sel = self.selected_slot()
         if self.follow and sel is not None:
             self.cam.center = self.interpolated_heads(np.array([sel]))[0]
-        self.draw_terrain()
+        v = self.view()
+        self.terrain_view.draw(self.canvas, v, self.time)
+        self.shadow.fill((0, 0, 0, 0))
         self.draw_creatures(dt)
+        self.canvas.blit(self.shadow, (0, 0))
         if sel is not None:
-            w = self.w
-            vis = w.terrain.visibility[w.terrain.cell_of(w.pos[sel])]
-            p = self.cam.rel(self.interpolated_heads(np.array([sel]))[0]) * self.cam.zoom + self.cam.screen / 2
-            pygame.draw.circle(self.screen, TXT, p, w.det_radius[sel] * vis * self.cam.zoom, 1)
+            self._draw_detection_ring(sel, v)
+        size = (self.canvas.get_width() * self.pixel, self.canvas.get_height() * self.pixel)
+        self.screen.blit(pygame.transform.scale(self.canvas, size), (0, 0))
         self.draw_hud(sel)
         pygame.display.flip()
 
-    def draw_hud(self, sel) -> None:
+    def _draw_detection_ring(self, sel: int, v: View) -> None:
+        w = self.w
+        vis = w.terrain.visibility[w.terrain.cell_of(w.pos[sel])]
+        head = self.interpolated_heads(np.array([sel]))[0]
+        p = self.cam.rel(head) * v.zoom + v.canvas_center
+        r = w.det_radius[sel] * vis * v.zoom
+        # anillo punteado a mano: arcos cortos alternados
+        n = max(12, int(r / 3))
+        for k in range(0, n, 2):
+            a0, a1 = 2 * np.pi * k / n, 2 * np.pi * (k + 1) / n
+            pygame.draw.arc(self.canvas, pal.PAPER, (p[0] - r, p[1] - r, 2 * r, 2 * r), a0, a1)
+
+    # ---------- HUD: fichas de papel con borde de tinta ----------
+    def _panel(self, lines: list[tuple[str, pal.Color]], pos: tuple[int, int],
+               chips: list[pal.Color | None] | None = None) -> None:
+        pad, lh = 10, 18
+        width = max(self.font.size(t)[0] for t, _ in lines) + 2 * pad + (18 if chips else 0)
+        height = len(lines) * lh + 2 * pad
+        panel = pygame.Surface((width, height), pygame.SRCALPHA)
+        panel.fill((*pal.PAPER, 235))
+        self.screen.blit(panel, pos)
+        pygame.draw.rect(self.screen, pal.INK, (*pos, width, height), 2)
+        y = pos[1] + pad
+        for j, (text, color) in enumerate(lines):
+            x = pos[0] + pad
+            if chips and chips[j] is not None:
+                pygame.draw.rect(self.screen, chips[j], (x, y + 3, 11, 11))
+                pygame.draw.rect(self.screen, pal.INK, (x, y + 3, 11, 11), 1)
+                x += 18
+            font = self.font_bold if j == 0 else self.font
+            self.screen.blit(font.render(text, True, color), (x, y))
+            y += lh
+
+    def draw_hud(self, sel: int | None) -> None:
         w = self.w
         mouse_cell = w.terrain.cell_of(self.cam.to_world(pygame.mouse.get_pos()))
         biome = Biome(int(w.terrain.biome[mouse_cell])).key
-        lines = [
-            (f"tick {w.tick}   {self.tps:.0f} ticks/s   {self.clock.get_fps():.0f} fps   "
-             f"zoom x{self.cam.zoom / self.cam.min_zoom:.1f}   bajo el cursor: {biome}"
-             + ("   [PAUSA]" if self.paused else "") + ("   [SIGUIENDO]" if self.follow else ""), TXT),
-        ]
+        status = ("   [PAUSA]" if self.paused else "") + ("   [SIGUIENDO]" if self.follow else "")
+        lines: list[tuple[str, pal.Color]] = [(f"tick {w.tick}{status}", pal.INK)]
+        chips: list[pal.Color | None] = [None]
         for sp_id, sp in enumerate(w.cfg.species):
             n = int((w.alive & (w.species == sp_id)).sum())
-            lines.append((f"{sp.name:<10} {n:>5}", sp.color))
+            lines.append((f"{sp.name:<10} {n:>5}", pal.INK))
+            chips.append(self.creature_view.colors[sp_id].accent)
+        self._panel(lines, (10, 10), chips)
+
+        info = (f"{self.tps:.0f} ticks/s · {self.clock.get_fps():.0f} fps · "
+                f"zoom x{self.cam.zoom / self.cam.min_zoom:.1f} · píxel {self.pixel} · {biome}")
+        self._panel([(info, pal.INK)], (10, int(self.cam.screen[1]) - 48))
+
         if sel is not None:
-            lines.append(("", TXT))
-            for k, v in describe_creature(w, sel).items():
-                lines.append((f"{CREATURE_LABELS[k]}: {v}", TXT))
-        y = 8
-        for text, color in lines:
-            self.screen.blit(self.font.render(text, True, SHADOW), (11, y + 1))
-            self.screen.blit(self.font.render(text, True, color), (10, y))
-            y += 18
-        help_ = "rueda: zoom · clic der./WASD: mover · clic: elegir · F: seguir · espacio: pausa · ↑↓: velocidad"
-        self.screen.blit(self.font.render(help_, True, TXT), (10, self.cam.screen[1] - 22))
+            card = [(f"criatura #{w.uid[sel]}", pal.INK)]
+            for k, val in describe_creature(w, sel).items():
+                if k != "uid":
+                    card.append((f"{CREATURE_LABELS[k]}: {val}", pal.INK))
+            self._panel(card, (int(self.cam.screen[0]) - 470, 10))
 
     def run(self) -> None:
         running = True
@@ -332,7 +308,7 @@ class Viewer:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(prog="python -m viewer")
     ap.add_argument("--config", default=None)
     ap.add_argument("--seed", type=int, default=None)
     ap.add_argument("--tps", type=float, default=20.0, help="ticks de simulación por segundo")

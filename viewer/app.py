@@ -25,7 +25,7 @@ from especies.config import load_config
 from especies.genes import Gene, norm
 from especies.geometry import torus_delta, wrap
 from especies.metrics import CreatureInfo, describe_creature
-from especies.state import World, create_world
+from especies.state import Action, World, create_world
 from especies.step import step
 from especies.terrain import Biome
 
@@ -229,7 +229,8 @@ class Viewer:
             self.canvas, self.shadow, self.view(), self.rig, a, w.species[a], base, radius,
             energy_frac=w.energy[a] / w.reserve[a],
             x_acc=x_acc, x_det=norm(g[:, Gene.DETECTION]),
-            x_mate=norm(g[:, Gene.MATING]), time=self.time)
+            x_mate=norm(g[:, Gene.MATING]), x_agg=norm(g[:, Gene.AGGRESSION]),
+            x_diet=norm(g[:, Gene.DIET]), time=self.time)
 
     # ---------- dibujo general ----------
     def selected_slot(self) -> int | None:
@@ -253,10 +254,25 @@ class Viewer:
         self.canvas.blit(self.shadow, (0, 0))
         if sel is not None:
             self._draw_detection_ring(sel, v)
+            self._draw_target_line(sel, v)
         size = (self.canvas.get_width() * self.pixel, self.canvas.get_height() * self.pixel)
         self.screen.blit(pygame.transform.scale(self.canvas, size), (0, 0))
         self.draw_hud(sel)
         pygame.display.flip()
+
+    def _draw_target_line(self, sel: int, v: View) -> None:
+        """Línea punteada hacia lo que persigue o de lo que huye la criatura elegida."""
+        w = self.w
+        t = int(w.target[sel])
+        if w.action[sel] not in (Action.HUNT, Action.FLEE) or t < 0 or not w.alive[t]:
+            return
+        heads = self.interpolated_heads(np.array([sel, t]))
+        a = self.cam.rel(heads[0]) * v.zoom + v.canvas_center
+        b = a + torus_delta(heads[0], heads[1], w.size) * v.zoom
+        color = pal.MEAT if w.action[sel] == Action.HUNT else pal.PAPER
+        for k in range(0, 10, 2):
+            p0, p1 = a + (b - a) * k / 10, a + (b - a) * (k + 1) / 10
+            pygame.draw.line(self.canvas, color, p0, p1)
 
     def _draw_detection_ring(self, sel: int, v: View) -> None:
         w = self.w

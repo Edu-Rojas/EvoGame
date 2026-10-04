@@ -86,6 +86,7 @@ class Viewer:
         self.selected_uid = -1
         self.acc = 0.0
         self.prev_pos = world.pos.copy()
+        self.prev_uid = world.uid.copy()
         self.time = 0.0
         cfg = world.cfg
         self.cam = Camera(world.size)
@@ -147,6 +148,10 @@ class Viewer:
         if ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_SPACE:
                 self.paused = not self.paused
+                if not self.paused:
+                    # en pausa se dibuja el tick actual; al seguir, se corre uno ya y
+                    # se interpola desde ahí (si no, el mundo saltaría un tick atrás)
+                    self.acc = 1.0
             elif ev.key == pygame.K_UP:
                 self.tps = min(self.tps * 1.5, 600)
             elif ev.key == pygame.K_DOWN:
@@ -192,12 +197,16 @@ class Viewer:
         self.acc = min(self.acc, 1.0)
         for _ in range(n):
             self.prev_pos = self.w.pos.copy()
+            self.prev_uid = self.w.uid.copy()
             step(self.w)
 
     def interpolated_heads(self, slots: np.ndarray) -> np.ndarray:
-        alpha = 0.0 if self.paused else min(self.acc, 1.0)
+        alpha = np.full(len(slots), 1.0 if self.paused else min(self.acc, 1.0))
+        # un slot reutilizado por una cría guarda la posición del muerto anterior:
+        # la cría se dibuja directo donde nació
+        alpha[self.prev_uid[slots] != self.w.uid[slots]] = 1.0
         prev, cur = self.prev_pos[slots], self.w.pos[slots]
-        return wrap(prev + torus_delta(prev, cur, self.w.size) * alpha, self.w.size)
+        return wrap(prev + torus_delta(prev, cur, self.w.size) * alpha[:, None], self.w.size)
 
     # ---------- criaturas ----------
     def draw_creatures(self, dt: float) -> None:

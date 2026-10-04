@@ -273,20 +273,21 @@ class CreatureRenderer:
         for i, r in enumerate(r_list):
             c = self.colors[sp_list[i]]
             # patas y garras (debajo del cuerpo)
-            leg_w = max(1, int(round(r * 0.22)))
+            leg_w = max(1, int(round(r * 0.3)))
             for k in range(4):
                 pygame.draw.lines(canvas, ink, False, legs[i][k], leg_w)
                 if r >= 7:
                     f0, *claws = toes[i][k]
                     for toe in claws:
                         pygame.draw.line(canvas, ink, f0, toe)
-            # branquias (salen de debajo de la cabeza)
+            # branquias pastel (salen de debajo de la cabeza): de color, para no
+            # confundirse con las patas de tinta
             if mates[i] > 0.05:
-                gw = max(1, int(round(r * 0.12)))
+                gw = max(1, int(round(r * 0.14)))
                 for strand in gills[i]:
-                    pygame.draw.lines(canvas, ink, False, strand, gw)
+                    pygame.draw.lines(canvas, c.accent_light, False, strand, gw)
                     if r >= 5:
-                        pygame.draw.circle(canvas, c.accent_light, strand[-1], max(1.0, r * 0.1))
+                        pygame.draw.circle(canvas, c.accent, strand[-1], max(1.0, r * 0.12))
             # silueta de tinta, cuerpo, volumen y manchas
             pygame.draw.polygon(canvas, ink, body_ink[i])
             pygame.draw.polygon(canvas, ink, head_ink[i])

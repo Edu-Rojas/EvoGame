@@ -26,7 +26,7 @@ from especies.geometry import torus_delta
 
 # ---------- plan del cuerpo (en múltiplos del radio de la criatura) ----------
 #              cabeza cuello pecho vientre cadera cola  punta
-SEG_RADII = np.array([0.70, 0.42, 0.78, 0.82, 0.68, 0.40, 0.22])
+SEG_RADII = np.array([0.70, 0.42, 0.80, 0.84, 0.58, 0.24, 0.12])
 SEG_LEN = np.array([0.0, 0.75, 0.90, 0.95, 0.95, 1.20, 1.35])   # largo del eslabón k-1 -> k
 MAX_BEND = np.radians([0, 0, 30, 30, 35, 45, 55])              # la cola latiguea más
 N_SEG = len(SEG_RADII)
@@ -75,7 +75,7 @@ class Rig:
     @staticmethod
     def body_params(radius: np.ndarray, x_acc: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         spacing = radius * (0.65 + 0.4 * x_acc)          # aceleración = cuerpo más largo
-        leg_len = radius * (1.1 + 0.7 * x_acc)           # y patas más largas (guepardo)
+        leg_len = radius * (0.9 + 0.55 * x_acc)          # y patas más largas (guepardo)
         return spacing, leg_len
 
     # ---------- ciclo de vida del rig ----------
@@ -228,7 +228,7 @@ class Rig:
         f0, s0, w0 = fwd[:, 0], side[:, 0], width[:, 0]
         cap = (sp[:, 0, None, :] + (f0[:, None, :] * np.cos(ang)[None, :, None]
                                      + s0[:, None, :] * np.sin(ang)[None, :, None]) * w0[:, None, :])
-        tip = sp[:, -1] - fwd[:, -1] * (width[:, -1] * 2.2 + pad[:, None])   # cola en punta
+        tip = sp[:, -1] - fwd[:, -1] * (width[:, -1] * 3.0 + pad[:, None])   # cola en punta
         return np.concatenate([left[:, ::-1], cap, right, tip[:, None]], axis=1)
 
     def back_highlight(self, slots, radius, light_dir) -> np.ndarray:

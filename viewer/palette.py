@@ -47,7 +47,7 @@ def to_rgb_list(c: np.ndarray) -> list[Color]:
 
 def stylize_terrain(colors: np.ndarray) -> np.ndarray:
     """Colores de bioma de la config -> versión pastel apagada del visor."""
-    return mix(desaturate(colors, 0.3), PAPER, 0.22)
+    return mix(desaturate(colors, 0.15), PAPER, 0.2)
 
 
 @dataclass(frozen=True)

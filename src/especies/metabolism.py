@@ -1,4 +1,4 @@
-"""Energía y vida: comer pasto, gastar, envejecer, morir, y el rebrote del pasto."""
+"""Energía y vida: comer (pasto, hojas o carne), gastar, envejecer, morir y dejar carne."""
 from __future__ import annotations
 
 import numpy as np
@@ -14,12 +14,13 @@ EAT_REACH_CELLS = 0.35
 
 
 def eat(w: World) -> None:
-    """Las criaturas que llegaron a su celda objetivo pastan.
+    """Las criaturas que llegaron a su celda objetivo comen de la capa que más energía
+    les rinde: pasto, hojas altas (si las alcanzan) o carne.
 
-    Si varias pastan la misma celda y no alcanza, se reparte en proporción
-    (vectorizado con bincount, sin bucles por criatura).
+    Si varias comen la misma capa de la misma celda y no alcanza, se reparte en
+    proporción (vectorizado con bincount, sin bucles por criatura).
     """
-    b, m, t = w.cfg.body, w.cfg.movement, w.terrain
+    m, t = w.cfg.movement, w.terrain
     a = w.alive_idx()
     eaters = a[(w.action[a] == Action.EAT) & (w.target[a] != NO_TARGET)]
     if len(eaters) == 0:
@@ -31,19 +32,30 @@ def eat(w: World) -> None:
     if len(eaters) == 0:
         return
 
-    eff = w.plant_eff[eaters]
+    layers = (t.grass, t.leaves, t.meat)
+    eff = np.stack([w.plant_eff[eaters], w.plant_eff[eaters] * w.leaf_reach[eaters],
+                    w.meat_eff[eaters]], axis=1)
+    stock = np.stack([layer[cell] > 0 for layer in layers], axis=1)
+    rate = eff * stock                               # cuánto rinde cada capa disponible
+    best = rate.argmax(axis=1)
+    for k, layer in enumerate(layers):
+        on = (best == k) & (rate[:, k] > 0)
+        if on.any():
+            _graze(w, layer, eaters[on], cell[on], eff[on, k])
+
+
+def _graze(w: World, layer: np.ndarray, eaters: np.ndarray, cell: np.ndarray,
+           eff: np.ndarray) -> None:
+    """Come de una capa del terreno con reparto justo cuando no alcanza."""
     room = np.maximum(w.reserve[eaters] - w.energy[eaters], 0.0)
-    # pasto que le cabe, contando lo que de verdad aprovecha; quien no saca nada de
-    # las plantas (carnívoro puro) no arranca pasto para nada
-    want = np.where(eff > 0, np.minimum(b.bite, room / np.maximum(eff, 1e-12)), 0.0)
-
-    n_cells = len(t.grass)
+    # come lo que le cabe contando lo que de verdad aprovecha (eff > 0 aquí)
+    want = np.minimum(w.cfg.body.bite, room / eff)
+    n_cells = len(layer)
     demand = np.bincount(cell, weights=want, minlength=n_cells)
-    ratio = np.divide(t.grass, demand, out=np.ones(n_cells), where=demand > 0)
+    ratio = np.divide(layer, demand, out=np.ones(n_cells), where=demand > 0)
     got = want * np.minimum(ratio, 1.0)[cell]
-
-    t.grass -= np.minimum(demand, t.grass)
-    w.energy[eaters] = np.minimum(w.reserve[eaters], w.energy[eaters] + got * w.plant_eff[eaters])
+    layer -= np.minimum(demand, layer)
+    w.energy[eaters] = np.minimum(w.reserve[eaters], w.energy[eaters] + got * eff)
 
 
 def spend(w: World) -> None:
@@ -73,20 +85,46 @@ def spend(w: World) -> None:
 def die(w: World) -> np.ndarray:
     """Muere quien se queda sin energía o llega al final de su vida. Devuelve los slots.
 
-    Cuenta la causa por especie y anota el tick en que una especie se extingue.
+    Causas: cazado (vida en 0; el crédito es del último que la mordió), hambre y vejez.
+    Todo cadáver deja carne en su celda: por su tamaño más parte de la energía que
+    tenía (los muertos de hambre o vejez también: carroña). Cuenta la causa por
+    especie y anota el tick en que una especie se extingue.
     """
-    starved = w.alive & (w.energy <= 0)
-    old = w.alive & ~starved & (w.age >= w.cfg.body.base_lifespan)
-    idx = np.flatnonzero(starved | old)
+    hunted = w.alive & (w.health <= 0)
+    starved = w.alive & ~hunted & (w.energy <= 0)
+    old = w.alive & ~hunted & ~starved & (w.age >= w.cfg.body.base_lifespan)
+    idx = np.flatnonzero(hunted | starved | old)
     if len(idx) == 0:
         return idx
-    for cause, mask in ((DeathCause.STARVATION, starved), (DeathCause.OLD_AGE, old)):
+    for cause, mask in ((DeathCause.PREDATION, hunted), (DeathCause.STARVATION, starved),
+                        (DeathCause.OLD_AGE, old)):
         np.add.at(w.deaths_by_cause[:, cause], w.species[mask], 1)
+    _credit_kills(w, w.last_hitter[hunted])
+    _drop_meat(w, idx)
     w.alive[idx] = False
     w.target[idx] = NO_TARGET
+    w.target_uid[idx] = -1
     w.deaths_total += len(idx)
     _mark_extinctions(w, np.unique(w.species[idx]))
     return idx
+
+
+def _credit_kills(w: World, killer_uids: np.ndarray) -> None:
+    killer_uids = killer_uids[killer_uids >= 0]
+    if len(killer_uids) == 0:
+        return
+    a = w.alive_idx()
+    order = np.argsort(w.uid[a])
+    sorted_uids = w.uid[a][order]
+    pos = np.searchsorted(sorted_uids, killer_uids)
+    found = (pos < len(sorted_uids)) & (sorted_uids[np.minimum(pos, len(sorted_uids) - 1)] == killer_uids)
+    np.add.at(w.kills, a[order[pos[found]]], 1)
+
+
+def _drop_meat(w: World, dead: np.ndarray) -> None:
+    mc = w.cfg.meat
+    meat = mc.per_size * w.genes[dead, Gene.SIZE] + mc.energy_fraction * np.maximum(w.energy[dead], 0.0)
+    np.add.at(w.terrain.meat, w.terrain.cell_of(w.pos[dead]), meat)
 
 
 def _mark_extinctions(w: World, species: np.ndarray) -> None:
@@ -95,5 +133,6 @@ def _mark_extinctions(w: World, species: np.ndarray) -> None:
             w.extinct_at[sp] = w.tick
 
 
-def regrow_grass(w: World) -> None:
+def regrow(w: World) -> None:
+    """Rebrote de pasto y hojas, y la carne que se pudre."""
     w.terrain.regrow_step()

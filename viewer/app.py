@@ -39,7 +39,8 @@ MAX_ZOOM = 12.0
 PIXEL_SIZES = (2, 3, 4)
 MAX_TICKS_PER_FRAME = 50
 # Textos del HUD (la simulación devuelve datos crudos con claves neutras)
-ACTION_LABELS = {"explore": "explorar", "eat": "comer", "mate": "aparearse"}
+ACTION_LABELS = {"explore": "explorar", "eat": "comer", "mate": "aparearse",
+                 "hunt": "cazar", "flee": "huir"}
 
 
 def creature_card(info: CreatureInfo) -> list[str]:
@@ -51,7 +52,8 @@ def creature_card(info: CreatureInfo) -> list[str]:
     return [
         f"criatura #{info.uid} · {info.species}",
         f"generación {info.generation} · padres {parents}",
-        f"energía {info.energy:.0f}/{info.reserve:.0f} · edad {info.age:.0f}",
+        f"vida {info.health:.0f}/{info.max_health:.0f} · energía {info.energy:.0f}/{info.reserve:.0f}",
+        f"edad {info.age:.0f} · cazas {info.kills}",
         f"haciendo: {ACTION_LABELS[info.action]}",
         f"genes: {genes}",
         f"instintos: {instincts}",

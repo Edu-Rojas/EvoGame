@@ -43,4 +43,5 @@ def test_inactive_genes_stay_put_across_generations(cfg):
     run(w, 800)
     kids = w.alive & (w.generation > 0)
     assert kids.any()
-    assert (w.genes[kids, Gene.AGGRESSION] == 1.0).all()
+    assert (w.genes[kids, Gene.CAMOUFLAGE] == 1.0).all()      # inactivo hasta la 1c
+    assert w.genes[kids, Gene.AGGRESSION].std() > 0            # activo desde la 1b: muta

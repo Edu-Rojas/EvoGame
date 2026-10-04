@@ -100,6 +100,8 @@ class TerrainCfg:
 class BiomeCfg:
     regrow: float
     max_grass: float
+    max_leaves: float
+    leaf_regrow: float
     speed: float
     visibility: float
     cost: float
@@ -107,7 +109,7 @@ class BiomeCfg:
     color_bare: tuple[int, int, int]
 
     def __post_init__(self) -> None:
-        _non_negative(self, "regrow", "max_grass", "visibility", "cost")
+        _non_negative(self, "regrow", "max_grass", "max_leaves", "leaf_regrow", "visibility", "cost")
         _positive(self, "speed")
         _color("color_lush", self.color_lush)
         _color("color_bare", self.color_bare)
@@ -211,18 +213,78 @@ class ReproductionCfg:
 
 
 @dataclass(frozen=True)
+class LeavesCfg:
+    per_cell: float
+    reach_min_size: float
+    reach_full_size: float
+
+    def __post_init__(self) -> None:
+        _non_negative(self, "per_cell", "reach_min_size")
+        _require(self.reach_full_size > self.reach_min_size,
+                 "reach_full_size debe ser mayor que reach_min_size")
+
+
+@dataclass(frozen=True)
+class CombatCfg:
+    health_per_size: float
+    health_regen: float
+    bite_base: float
+    bite_size_exponent: float
+    weapons_herbivore: float
+    weapons_carnivore: float
+    bite_energy_cost: float
+    retaliation: float
+    max_prey_ratio: float
+    predator_meat_eff: float
+    aggression_factor_min: float
+    aggression_factor_max: float
+    chase_ticks: int
+    chase_min_mult: float
+    chase_max_mult: float
+    satiety_fraction: float
+    newborn_health_energy: float
+    newborn_health_min: float
+
+    def __post_init__(self) -> None:
+        _positive(self, "health_per_size", "bite_base", "max_prey_ratio", "chase_ticks",
+                  "aggression_factor_min", "newborn_health_energy")
+        _non_negative(self, "bite_size_exponent", "weapons_herbivore", "weapons_carnivore",
+                      "bite_energy_cost", "retaliation", "chase_min_mult")
+        _fraction(self, "health_regen", "predator_meat_eff", "satiety_fraction",
+                  "newborn_health_min")
+        _require(self.aggression_factor_max >= self.aggression_factor_min,
+                 "aggression_factor_max debe ser >= aggression_factor_min")
+        _require(self.chase_max_mult >= self.chase_min_mult,
+                 "chase_max_mult debe ser >= chase_min_mult")
+
+
+@dataclass(frozen=True)
+class MeatCfg:
+    per_size: float
+    energy_fraction: float
+    rot: float
+    min_amount: float
+
+    def __post_init__(self) -> None:
+        _non_negative(self, "per_size", "min_amount")
+        _fraction(self, "energy_fraction", "rot")
+
+
+@dataclass(frozen=True)
 class BehaviorCfg:
     decision_noise: float
     explore_base: float
     eat_base: float
     mate_base: float
+    hunt_base: float
+    flee_base: float
     instinct_sigma: float
     instinct_min: float
     instinct_max: float
 
     def __post_init__(self) -> None:
         _non_negative(self, "decision_noise", "explore_base", "eat_base", "mate_base",
-                      "instinct_sigma")
+                      "hunt_base", "flee_base", "instinct_sigma")
         _positive(self, "instinct_min")
         _require(self.instinct_min <= self.instinct_max,
                  f"instinct_min={self.instinct_min} es mayor que instinct_max={self.instinct_max}")
@@ -257,6 +319,9 @@ class Config:
     detection: DetectionCfg
     diet: DietCfg
     reproduction: ReproductionCfg
+    leaves: LeavesCfg
+    combat: CombatCfg
+    meat: MeatCfg
     behavior: BehaviorCfg
     stats: StatsCfg
     species: tuple[SpeciesCfg, ...]
@@ -265,8 +330,8 @@ class Config:
 SECTIONS: dict[str, type] = {
     "sim": SimCfg, "world": WorldCfg, "terrain": TerrainCfg, "genes": GenesCfg,
     "body": BodyCfg, "movement": MovementCfg, "detection": DetectionCfg,
-    "diet": DietCfg, "reproduction": ReproductionCfg, "behavior": BehaviorCfg,
-    "stats": StatsCfg,
+    "diet": DietCfg, "reproduction": ReproductionCfg, "leaves": LeavesCfg,
+    "combat": CombatCfg, "meat": MeatCfg, "behavior": BehaviorCfg, "stats": StatsCfg,
 }
 SPECIES_KEYS = {"name", "color", "count", "genes"}
 

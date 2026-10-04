@@ -27,6 +27,35 @@ def _full_world_with_a_couple(cfg, free_slots: int):
     return w, ready
 
 
+def _couple_world(make_world, n, **columns):
+    defaults = dict(species=0, radius=4.0, energy=100.0, reserve=200.0, cooldown=0,
+                    action=Action.MATE)
+    defaults.update(columns)
+    w = make_world(n=n, **defaults)
+    ready = w.alive.copy()
+    return w, ready
+
+
+def test_each_creature_mates_once_per_tick(make_world):
+    # 1 y 2 apuntan los dos a 0 y están en contacto: solo una pareja se forma
+    w, ready = _couple_world(make_world, 3, target=[1, 0, 0],
+                             pos=[[100.0, 100.0], [101.0, 100.0], [100.0, 101.0]])
+    reproduce(w, ready)
+    assert (w.cooldown[:3] > 0).sum() == 2
+
+
+def test_no_mating_across_species(make_world):
+    w, ready = _couple_world(make_world, 2, species=[0, 1], target=[1, 0],
+                             pos=[[100.0, 100.0], [101.0, 100.0]])
+    assert reproduce(w, ready) == 0
+
+
+def test_no_mating_without_contact(make_world):
+    w, ready = _couple_world(make_world, 2, target=[1, 0],
+                             pos=[[100.0, 100.0], [180.0, 100.0]])
+    assert reproduce(w, ready) == 0
+
+
 def test_litter_size_by_mating_gene(cfg):
     from especies.reproduction import litter_size
     w = create_world(cfg, seed=0)

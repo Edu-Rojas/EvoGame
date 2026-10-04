@@ -15,8 +15,9 @@ All notable changes to this project are documented here. The format follows
 - Pixel-art viewer: low-resolution canvas, ink-outlined lizard-like creatures with
   clawed feet, gills and shadows, dithered pastel terrain with hand-drawn decor,
   three levels of detail and switchable pixel size (`P`).
-- Test suite split per module with a `make_world` fixture (73 tests); slow
-  evolution runs are marked `slow`.
+- Test suite split per module with a `make_world` fixture (96 tests): world
+  invariants, mating rules, perception regressions and headless viewer rendering;
+  slow evolution runs are marked `slow`.
 - ruff (including security rules) and mypy configuration.
 - CI: lint, type check, tests on Linux and Windows (Python 3.11 and 3.13),
   secret scanning and dependency audit.
@@ -41,9 +42,23 @@ All notable changes to this project are documented here. The format follows
 - Newborns in recycled slots were interpolated from the previous occupant, and
   pausing jumped the world one tick back.
 - Extinct species printed rows of `nan` in the headless report.
+- Mate search only looked at the nearest neighbours of any species, so creatures
+  surrounded by another species missed mates in range; this favoured the most
+  numerous species. Mates are now searched per species among ready creatures.
+- Pure carnivores grazed and removed grass for no energy.
+- Config accepted floats for integer fields, fractional species counts and
+  duplicate species names.
+- Non-positive `--ticks`/`--every` crashed the headless CLI.
+
+### Performance
+- Terrain pixel mapping is cached per camera view; the rig animates only
+  on-screen creatures; `World.size` no longer allocates on every access.
 
 ### Security
 - `.gitignore` covers environment files, private keys and local overrides.
+- `SECURITY.md` with private vulnerability reporting.
+- GitHub Actions pinned to commit SHAs, Dependabot for pip and actions,
+  pre-commit hooks (gitleaks, ruff, personal-data guard).
 
 ## [0.1.0] - 2026-10-04
 

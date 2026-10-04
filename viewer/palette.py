@@ -17,6 +17,7 @@ Color = tuple[int, int, int]
 INK: Color = (38, 30, 46)          # negro violáceo, más vivo que el negro puro
 PAPER: Color = (244, 236, 222)     # blanco cálido de cuaderno
 SHADOW_ALPHA = 70                  # opacidad de la sombra de las criaturas
+MEAT: Color = (122, 46, 58)        # carne y sangre en el suelo: vino oscuro, no rojo puro
 
 
 def mix(a: np.ndarray | Color, b: np.ndarray | Color, t: float | np.ndarray) -> np.ndarray:

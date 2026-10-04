@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added (stage 1b: predators)
+- Health, biting and retaliation; kills credited to the last attacker; deaths
+  counted per species by cause (starvation, old age, predation).
+- Hunt and flee actions: size refuge, satiety (Holling II), search image
+  (Holling III), chase limits set by Aggression, targets validated by uid.
+- Meat left by every corpse, rotting over time; tall forest leaves only large
+  creatures reach; food valued per creature across grass, leaves and meat.
+- Coexistence mechanisms: cover that hides prey, fleeing toward cover,
+  philopatry, grouped founders, density-dependent disease (ADR 0006).
+- `especies-acceptance`: multi-seed runs with survivors, extinction ticks and
+  causes of death.
+- Viewer: ears and eyes shaped by Aggression, fangs for carnivores, meat stains,
+  browsed bushes, pursuit line and health/kills on the creature card.
+- Aggression is an active gene; example species include a carnivore (Lobos).
+
 ### Added
 - `especies-headless` console script and `python -m viewer` entry points.
 - Strict range validation for every config section, plus cross-section checks

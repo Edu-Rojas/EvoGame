@@ -34,6 +34,9 @@ SHADOW_OFFSET = np.array([0.35, 0.5])         # sombra hacia abajo a la derecha 
 DECOR_MIN_CELL_PX = 12
 SMALL_MIN_PX = 1.2
 DETAIL_MIN_PX = 3.0
+FANG_MIN_DIET = 0.35       # dieta normalizada desde la que se dibujan colmillos
+MEAT_FULL = 60.0           # carne en una celda que la tiñe al máximo
+MEAT_TINT_MAX = 0.75
 
 
 @dataclass
@@ -100,6 +103,9 @@ class TerrainRenderer:
         t = self.t
         frac = np.divide(t.grass, t.grass_max, out=np.ones_like(t.grass), where=t.grass_max > 0)
         rgb = self.bare + (self.lush - self.bare) * frac[:, None]
+        # carne: donde hubo una muerte el suelo se mancha, y se borra al pudrirse
+        meat = np.clip(t.meat / MEAT_FULL, 0.0, 1.0) * MEAT_TINT_MAX
+        rgb = pal.mix(rgb, pal.MEAT, meat)
         return np.clip(rgb, 0, 255)
 
     def draw(self, canvas: pygame.Surface, v: View, time: float) -> None:
@@ -160,9 +166,14 @@ class TerrainRenderer:
         # posición en el lienzo (celdas sin envolver: así cruzar el borde no salta)
         origin = (np.stack([ix, iy], axis=1) * cs - v.center) * z + v.canvas_center
         on = kind >= 0
-        # las matas y flores solo están si queda pasto: se ve el pastoreo
+        # las matas y flores solo están si queda pasto, y los arbustos si quedan hojas
+        # altas: se ve qué se está comiendo cada uno
+        seed_k = self.decor_seed[cell]
         grassy = (kind == Decor.TUFT) | (kind == Decor.FLOWER)
-        on &= ~grassy | (frac[:, None] >= 0.35 + 0.4 * self.decor_seed[cell])
+        on &= ~grassy | (frac[:, None] >= 0.35 + 0.4 * seed_k)
+        leaf_frac = np.divide(t.leaves[cell], t.leaves_max[cell],
+                              out=np.ones(len(cell)), where=t.leaves_max[cell] > 0)
+        on &= (kind != Decor.BUSH) | (leaf_frac[:, None] >= 0.15 + 0.6 * seed_k)
         ii, kk = np.nonzero(on)
         pos = (origin[ii] + self.decor_off[cell[ii], kk] * cs * z).tolist()
         size = (self.decor_size[cell[ii], kk] * cs * z).tolist()
@@ -219,7 +230,7 @@ class CreatureRenderer:
     def draw(self, canvas: pygame.Surface, shadow: pygame.Surface, v: View, rig: Rig,
              slots: np.ndarray, species: np.ndarray, base: np.ndarray, radius: np.ndarray,
              energy_frac: np.ndarray, x_acc: np.ndarray, x_det: np.ndarray,
-             x_mate: np.ndarray, time: float) -> None:
+             x_mate: np.ndarray, x_agg: np.ndarray, x_diet: np.ndarray, time: float) -> None:
         """base: posición de cada cabeza relativa al centro de la cámara (mundo)."""
         z, cc = v.zoom, v.canvas_center
         px_r = radius * z
@@ -271,6 +282,10 @@ class CreatureRenderer:
         eyes = np.stack([to_canvas(eye_l[:, None])[:, 0], to_canvas(eye_r[:, None])[:, 0]],
                         axis=1).tolist()
         eye_px = np.maximum(1.0, eye_rad * z).tolist()
+        eye_polys = to_canvas(rig.eye_shapes(s, rad, x_det[d], x_agg[d])).tolist()
+        ears = to_canvas(rig.ears(s, rad, x_agg[d])).tolist()
+        fangs = to_canvas(rig.fangs(s, rad, x_diet[d])).tolist()
+        carnivore = (x_diet[d] > FANG_MIN_DIET).tolist()
         head_glow = (head_a.mean(axis=1) + LIGHT_DIR * r_px[:, None] * 0.35).tolist()
         bodies = pal.to_rgb_list(self._bodies(species[d], energy_frac[d]))
         mates = x_mate[d].tolist()
@@ -300,6 +315,11 @@ class CreatureRenderer:
                     pygame.draw.lines(canvas, c.accent_light, False, strand, gw)
                     if r >= 5:
                         pygame.draw.circle(canvas, c.accent, strand[-1], max(1.0, r * 0.12))
+            # orejas (debajo de la cabeza): la forma la pone Agresividad
+            if r >= 4:
+                for ear in ears[i]:
+                    pygame.draw.polygon(canvas, c.shade, ear)
+                    pygame.draw.polygon(canvas, ink, ear, 1)
             # silueta de tinta, cuerpo, volumen y manchas
             pygame.draw.polygon(canvas, ink, body_ink[i])
             pygame.draw.polygon(canvas, ink, head_ink[i])
@@ -312,12 +332,21 @@ class CreatureRenderer:
             pygame.draw.polygon(canvas, c.accent, head[i])
             if r >= 6:
                 pygame.draw.circle(canvas, c.accent_light, head_glow[i], max(1.0, r * 0.2))
+            # colmillos de carnívoro (Dieta)
+            if carnivore[i] and r >= 5:
+                for fang in fangs[i]:
+                    pygame.draw.polygon(canvas, pal.PAPER, fang)
+                    pygame.draw.polygon(canvas, ink, fang, 1)
+            # ojos: redondos si es dócil, rasgados si es agresivo
             er = eye_px[i]
-            for e in eyes[i]:
-                pygame.draw.circle(canvas, ink, e, er)
+            for e, poly in zip(eyes[i], eye_polys[i], strict=True):
+                if r >= 6:
+                    pygame.draw.polygon(canvas, ink, poly)
+                else:
+                    pygame.draw.circle(canvas, ink, e, er)
                 if r >= 8:
                     pygame.draw.circle(canvas, pal.PAPER, (e[0] - er * 0.3, e[1] - er * 0.4),
-                                       max(1.0, er * 0.35))
+                                       max(1.0, er * 0.3))
 
     def _bodies(self, species: np.ndarray, energy_frac: np.ndarray) -> np.ndarray:
         out = np.empty((len(species), 3))

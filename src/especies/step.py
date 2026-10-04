@@ -7,8 +7,10 @@ aleatoriedad sale de w.rng. Por eso misma semilla = misma simulación.
 """
 from __future__ import annotations
 
+from .combat import fight, heal
 from .decision import decide, validate_targets
-from .metabolism import die, eat, regrow_grass, spend
+from .disease import sicken
+from .metabolism import die, eat, regrow, spend
 from .perception import perceive
 from .physics import move, separate
 from .reproduction import ready_mask, reproduce
@@ -29,10 +31,13 @@ def step(w: World) -> None:
 
     move(w)
     separate(w)
+    fight(w)
     eat(w)
     reproduce(w, ready)
     spend(w)
-    regrow_grass(w)
+    sicken(w)
+    heal(w)
+    regrow(w)
     die(w)
     w.tick += 1
 

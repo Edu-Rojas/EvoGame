@@ -45,6 +45,7 @@ HEAD_SHAPE = np.array([
 GILL_ANGLES = np.radians([30.0, 55.0, 80.0])        # abanico de branquias por lado
 N_GILL_PTS = 6
 BACK_SPOTS = np.array([2, 3, 4])                    # segmentos con manchas en el lomo
+EYE_PTS = 8                                         # vértices de cada ojo
 
 
 def _perp(v: np.ndarray) -> np.ndarray:
@@ -262,6 +263,65 @@ class Rig:
         left = center + s * (rh * 0.5)[:, None]
         right = center - s * (rh * 0.5)[:, None]
         return left, right, er
+
+    def eye_shapes(self, slots, radius, x_det, x_agg) -> np.ndarray:
+        """Ojos como polígonos [n, 2, EYE_PTS, 2]: redondos si es dócil, rasgados e
+        inclinados hacia el hocico si es agresivo (Agresividad pone la forma, Detección
+        el tamaño)."""
+        sp, fwd, side = self._frame(slots)
+        f, s = fwd[:, 0], side[:, 0]
+        left, right, er = self.eyes(slots, radius, x_det)
+        ang = np.linspace(0, 2 * np.pi, EYE_PTS, endpoint=False)
+        height = 1.0 - 0.6 * x_agg                       # rasgado: más bajo que ancho
+        tilt = 0.5 * x_agg                               # inclinado hacia adelante
+        out = []
+        for center, sign in ((left, 1.0), (right, -1.0)):
+            ex = np.cos(ang)[None, :] * er[:, None] * 1.15
+            ey = np.sin(ang)[None, :] * er[:, None] * height[:, None]
+            c, sn = np.cos(tilt * sign)[:, None], np.sin(tilt * sign)[:, None]
+            lx, ly = ex * c - ey * sn, ex * sn + ey * c
+            out.append(center[:, None, :] + lx[..., None] * f[:, None, :] + ly[..., None] * s[:, None, :])
+        return np.stack(out, axis=1)
+
+    def ears(self, slots, radius, x_agg) -> np.ndarray:
+        """Orejas atrás de la cabeza [n, 2, 5, 2]: redondeadas si es dócil (conejo),
+        largas y puntiagudas si es agresivo (felino)."""
+        sp, fwd, side = self._frame(slots)
+        f, s = fwd[:, 0], side[:, 0]
+        rh = radius * SEG_RADII[0] * HEAD_SCALE
+        length = rh * (0.55 + 0.6 * x_agg)
+        width = rh * (0.55 - 0.25 * x_agg)
+        bulge = 0.75 - 0.55 * x_agg                       # redondez de los costados
+        out = []
+        for sign in (1.0, -1.0):
+            base = sp[:, 0] - f * (rh * 0.35)[:, None] + s * (rh * 0.62 * sign)[:, None]
+            # la oreja apunta hacia atrás y afuera
+            d = _normalize(-f * 1.0 + s * (0.8 * sign))
+            p = _perp(d) * sign
+            pts = [
+                base + p * (width * 0.5)[:, None],
+                base + d * (length * 0.55)[:, None] + p * (width * bulge)[:, None],
+                base + d * length[:, None],
+                base + d * (length * 0.55)[:, None] - p * (width * bulge * 0.6)[:, None],
+                base - p * (width * 0.5)[:, None],
+            ]
+            out.append(np.stack(pts, axis=1))
+        return np.stack(out, axis=1)
+
+    def fangs(self, slots, radius, x_diet) -> np.ndarray:
+        """Colmillos en la punta del hocico [n, 2, 3, 2] (más largos con más carne)."""
+        sp, fwd, side = self._frame(slots)
+        f, s = fwd[:, 0], side[:, 0]
+        rh = radius * SEG_RADII[0] * HEAD_SCALE
+        tip = sp[:, 0] + f * (rh * (0.15 + HEAD_SHAPE[0, 0] * 0.92))[:, None]
+        length = rh * (0.15 + 0.45 * x_diet)
+        out = []
+        for sign in (1.0, -1.0):
+            base = tip + s * (rh * 0.22 * sign)[:, None]
+            pts = [base - s * (rh * 0.09)[:, None], base + f * length[:, None],
+                   base + s * (rh * 0.09)[:, None]]
+            out.append(np.stack(pts, axis=1))
+        return np.stack(out, axis=1)
 
     def spots(self, slots, radius) -> tuple[np.ndarray, np.ndarray]:
         """Manchas sobre el lomo: posiciones [n, k, 2] y radios [n, k]."""

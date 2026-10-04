@@ -60,6 +60,12 @@ class Terrain:
     speed: np.ndarray       # [gh*gw] multiplicador de velocidad
     visibility: np.ndarray  # [gh*gw] multiplicador del radio de detección
     cost: np.ndarray        # [gh*gw] multiplicador de gasto de energía
+    leaves: np.ndarray      # [gh*gw] hojas altas: solo las alcanzan los grandes
+    leaves_max: np.ndarray  # [gh*gw]
+    leaf_regrow: np.ndarray # [gh*gw]
+    meat: np.ndarray        # [gh*gw] carne de cadáveres (se pudre)
+    meat_rot: float         # fracción de la carne que se pudre por tick
+    meat_min: float         # debajo de esto la carne desaparece
     food_offsets: np.ndarray      # [O, 2] desplazamientos (dx, dy) en celdas
     food_offset_dist: np.ndarray  # [O] distancia de cada desplazamiento
 
@@ -73,7 +79,11 @@ class Terrain:
         return np.stack([(cx + 0.5) * self.cell_size, (cy + 0.5) * self.cell_size], axis=-1)
 
     def regrow_step(self) -> None:
+        """Rebrota el pasto y las hojas; la carne se pudre y desaparece al quedar poca."""
         np.minimum(self.grass + self.regrow, self.grass_max, out=self.grass)
+        np.minimum(self.leaves + self.leaf_regrow, self.leaves_max, out=self.leaves)
+        self.meat *= 1.0 - self.meat_rot
+        self.meat[self.meat < self.meat_min] = 0.0
 
 
 def _smooth_field(rng: np.random.Generator, shape: tuple[int, int], scale: float) -> np.ndarray:
@@ -109,6 +119,7 @@ def create_terrain(cfg: Config, rng: np.random.Generator) -> Terrain:
         return table[biome]
 
     grass_max = per_cell("max_grass") * t.grass_per_cell
+    leaves_max = per_cell("max_leaves") * cfg.leaves.per_cell
     visibility = per_cell("visibility")
     d = cfg.detection
     offsets, offset_dist = food_offsets(t.cell_size,
@@ -121,6 +132,12 @@ def create_terrain(cfg: Config, rng: np.random.Generator) -> Terrain:
         speed=per_cell("speed"),
         visibility=visibility,
         cost=per_cell("cost"),
+        leaves=leaves_max.copy(),
+        leaves_max=leaves_max,
+        leaf_regrow=per_cell("leaf_regrow"),
+        meat=np.zeros(biome.size),
+        meat_rot=cfg.meat.rot,
+        meat_min=cfg.meat.min_amount,
         food_offsets=offsets,
         food_offset_dist=offset_dist,
     )

@@ -99,6 +99,9 @@ def reproduce(w: World, ready: np.ndarray) -> int:
             "generation": np.full(n, max(w.generation[i], w.generation[j]) + 1),
             "parent_a": np.full(n, w.uid[i]),
             "parent_b": np.full(n, w.uid[j]),
+            # cría con poca energía = cría frágil (camadas grandes y padres flacos)
+            "health_frac": np.full(n, np.clip(litter_energy / n / cfg.combat.newborn_health_energy,
+                                              cfg.combat.newborn_health_min, 1.0)),
         })
 
     if not batches:

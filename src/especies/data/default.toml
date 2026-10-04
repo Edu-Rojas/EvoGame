@@ -8,6 +8,8 @@
 seed = 42             # -1 = semilla aleatoria (se imprime para poder repetirla)
 capacity = 6000       # tope duro de criaturas vivas a la vez
 think_interval = 3    # cada cuántos ticks decide cada criatura (en la v2 lo pondrá Percepción)
+founder_spawn = "grouped"  # "grouped": cada especie nace en su zona (evitando el agua); "uniform": por todo el mapa
+founder_spread = 80.0      # radio aproximado de la zona de cada especie
 
 [world]
 width = 1600.0
@@ -26,14 +28,17 @@ forest_fraction = 0.24
 grass_per_cell = 30.0       # pasto máximo de una celda de pradera (los biomas lo multiplican)
 min_to_target = 3.0         # una celda con menos pasto que esto no vale la pena
 min_to_stay = 0.5           # si la celda objetivo baja de esto mientras va, se rinde y explora
-food_distance_penalty = 0.05  # al elegir dónde pastar: pasto - esto x distancia
+food_distance_penalty = 1.0   # al elegir dónde comer: energía - esto x energía real del viaje
 cold_size_exponent = 0.333  # regla de Bergmann: el frío cuesta / tamaño^(1/3)
 
-# Cada bioma: rebrote por tick, pasto máximo (x grass_per_cell), velocidad,
-# visibilidad (x radio de detección), costo (x gasto de energía) y colores.
+# Cada bioma: rebrote por tick, pasto máximo (x grass_per_cell), hojas altas máximas
+# (x [leaves] per_cell) y su rebrote, velocidad, visibilidad (x radio de detección),
+# costo (x gasto de energía) y colores.
 [biomes.pradera]
 regrow = 0.04
 max_grass = 1.0
+max_leaves = 0.0
+leaf_regrow = 0.0
 speed = 1.0
 visibility = 1.0
 cost = 1.0
@@ -43,6 +48,8 @@ color_bare = [150, 140, 92]
 [biomes.bosque]
 regrow = 0.06
 max_grass = 1.5
+max_leaves = 1.0            # solo el bosque tiene hojas altas: el nicho de los grandes
+leaf_regrow = 0.05
 speed = 0.7
 visibility = 0.6
 cost = 1.0
@@ -52,6 +59,8 @@ color_bare = [78, 86, 56]
 [biomes.desierto]
 regrow = 0.006
 max_grass = 0.3
+max_leaves = 0.0
+leaf_regrow = 0.0
 speed = 1.1
 visibility = 1.3
 cost = 1.15
@@ -61,6 +70,8 @@ color_bare = [198, 172, 112]
 [biomes.montana]
 regrow = 0.015
 max_grass = 0.5
+max_leaves = 0.0
+leaf_regrow = 0.0
 speed = 0.6
 visibility = 1.25
 cost = 1.3
@@ -70,6 +81,8 @@ color_bare = [104, 101, 97]
 [biomes.helada]
 regrow = 0.01
 max_grass = 0.4
+max_leaves = 0.0
+leaf_regrow = 0.0
 speed = 0.8
 visibility = 1.0
 cost = 1.6                  # el frío: los grandes pagan menos (Bergmann)
@@ -79,6 +92,8 @@ color_bare = [188, 198, 210]
 [biomes.agua]
 regrow = 0.0
 max_grass = 0.0
+max_leaves = 0.0
+leaf_regrow = 0.0
 speed = 0.35                # se cruza nadando, lento
 visibility = 1.0
 cost = 1.4
@@ -88,7 +103,7 @@ color_bare = [52, 98, 150]
 [genes]
 budget = 20           # puntos repartibles al crear la especie (todos los genes arrancan en 1)
 mutation_sigma = 0.3  # ruido de la mutación por gen y por nacimiento
-inactive = ["agresividad", "camuflaje"]  # todavía no hacen nada, así que no mutan (1b y 1c)
+inactive = ["camuflaje"]  # todavía no hace nada, así que no muta (se activa en la 1c)
 
 [body]
 base_radius = 4.0          # radio (de choque y visual) con tamaño 1; crece con la raíz del tamaño
@@ -115,12 +130,16 @@ veil_drag = 0.1            # apareamiento 10 = 10% más lento (las plumas largas
 contact_distance = 2.0     # distancia extra al radio para comer o aparearse
 separation_strength = 0.8  # qué tan fuerte se empujan dos cuerpos que se pisan (0 = se atraviesan)
 body_footprint = 1.5       # radio de "espacio personal" = radio x esto (el cuerpo es largo)
+home_range = 150.0         # filopatría: al explorar, más allá de esta distancia de donde nació...
+home_pull = 0.5            # ...lo atrae su "casa" con esta fuerza (0 = apagado, 1 = vuelve directo)
+cover_seek = 1.5           # al huir, cuánto tuerce hacia la cobertura cercana (0 = huye derecho)
 
 [detection]
 base_radius = 40.0
 max_multiplier = 3.0         # detección 10 = 3 veces el radio base
 appetite_extra_at_max = 0.25 # detección 10 = +25% de gasto basal
 appetite_curve = 2.0         # forma de ese costo: 2 = proporcional al área que cubre la vista
+
 [diet]
 exponent = 1.5   # >1 castiga a los omnívoros, <1 los favorece, 1 es neutro
 
@@ -132,11 +151,59 @@ max_litter = 4
 cooldown = 80                # ticks de espera entre apareamientos (igual para todos)
 spawn_spread = 6.0           # qué tan lejos de los padres aparecen las crías
 
+[leaves]
+per_cell = 30.0              # hojas altas máximas de una celda (los biomas lo multiplican)
+reach_min_size = 4.0         # con tamaño menor a esto no alcanza las hojas
+reach_full_size = 8.0        # desde este tamaño las alcanza todas (lineal en el medio)
+
+[combat]
+health_per_size = 10.0       # vida máxima = esto x tamaño
+health_regen = 0.002         # fracción de la vida máxima que se recupera por tick
+bite_base = 2.0              # daño por mordida con tamaño 1
+bite_size_exponent = 0.75    # daño = base x tamaño^esto x armas
+weapons_herbivore = 0.6      # multiplicador de daño con dieta 1 (sin colmillos)
+weapons_carnivore = 1.4      # con dieta 10 (colmillos)
+bite_energy_cost = 0.3       # energía que gasta el atacante por mordida
+retaliation = 0.5            # daño devuelto = su daño x agresividad normalizada x esto
+max_prey_ratio = 1.3         # solo caza presas de tamaño <= el suyo x esto (refugio por tamaño)
+predator_meat_eff = 0.2      # desde esta eficiencia con carne alguien caza y es una amenaza
+idle_threat = 0.3            # un depredador que no está cazando asusta esto (1 = igual que cazando)
+aggression_factor_min = 0.5  # agresividad 1: huye de amenazas de la mitad de su poder
+aggression_factor_max = 2.0  # agresividad 10: enfrenta amenazas de hasta el doble
+chase_ticks = 60             # persecución base antes de rendirse
+chase_min_mult = 0.5         # agresividad 1 persigue la mitad...
+chase_max_mult = 1.5         # ...y agresividad 10, una vez y media
+satiety_fraction = 0.8       # no caza con la energía por encima de esta fracción (Holling II)
+prey_search_half = 2.0       # imagen de búsqueda (Holling III): cazar vale x presas/(presas + esto)
+                             # según cuántas presas ve; 0 = apagado
+newborn_health_energy = 40.0 # energía de la cría que le da vida completa al nacer
+newborn_health_min = 0.3     # vida mínima al nacer (fracción de la máxima)
+
+[meat]
+per_size = 5.0               # carne que deja un cadáver por punto de tamaño. Ojo: el cuerpo no
+                             # se "paga" con energía, así que esto no puede ser alto: con 15 una
+                             # cría de conejo dejaba más carne que la energía que costó criarla
+                             # (energía gratis para los depredadores; Lindeman dice ~10-20%)
+energy_fraction = 0.25       # más esta fracción de la energía que tenía (con 0,5 los cadáveres
+                             # de los grandes mantenían a los depredadores sin cazar)
+rot = 0.002                  # fracción que se pudre por tick
+min_amount = 0.5             # debajo de esto la carne desaparece
+
+[disease]
+# Contagio por densidad ("kill the winner"): apiñarse con los de tu especie cuesta energía.
+radius = 30.0                # vecinos de su especie dentro de este radio
+free_neighbors = 3           # hasta esta cantidad no pasa nada (grupos chicos, sanos)
+cost_per_neighbor = 0.15     # gasto extra por vecino de más, como fracción del apetito (0 = apagado).
+                             # Sola no ayudaba; junto con la carne coherente frena a los
+                             # depredadores que se apiñan en los cadáveres
+
 [behavior]
 decision_noise = 0.08
 explore_base = 0.3     # utilidad base de explorar
 eat_base = 0.15        # utilidad de comer aunque no tenga hambre
 mate_base = 1.0        # utilidad de aparearse cuando está lista y ve pareja
+hunt_base = 1.5        # utilidad de cazar = esto x hambre x eficiencia con carne
+flee_base = 2.0        # utilidad de huir = esto x nivel de amenaza (0..1)
 instinct_sigma = 0.05  # mutación de los instintos heredables
 instinct_min = 0.2
 instinct_max = 3.0
@@ -146,8 +213,7 @@ generation_bonus = 0     # +tope de stats por generación (apagado, v2)
 
 # ---------------------------------------------------------------------
 # Especies de ejemplo. Genes de 1 a 10; puntos gastados = suma de (gen - 1).
-# En la 1a todos son herbívoros (dieta 1): carnívoros llegan en la 1b.
-# Agresividad y Camuflaje todavía no hacen nada: se heredan pero no mutan ([genes] inactive).
+# Camuflaje todavía no hace nada: se hereda pero no muta ([genes] inactive).
 # ---------------------------------------------------------------------
 [[species]]
 name = "Conejos"
@@ -159,10 +225,16 @@ genes = { tamano = 2, aceleracion = 4, agresividad = 1, dieta = 1, camuflaje = 1
 name = "Elefantes"
 color = [120, 170, 255]
 count = 50
-genes = { tamano = 9, aceleracion = 2, agresividad = 1, dieta = 1, camuflaje = 1, deteccion = 5, apareamiento = 1 }
+genes = { tamano = 9, aceleracion = 2, agresividad = 8, dieta = 1, camuflaje = 1, deteccion = 5, apareamiento = 1 }
 
 [[species]]
 name = "Ojones"
 color = [255, 170, 90]
 count = 60
 genes = { tamano = 4, aceleracion = 3, agresividad = 1, dieta = 1, camuflaje = 1, deteccion = 9, apareamiento = 3 }
+
+[[species]]
+name = "Lobos"
+color = [230, 90, 110]
+count = 30
+genes = { tamano = 4, aceleracion = 5, agresividad = 4, dieta = 9, camuflaje = 1, deteccion = 2, apareamiento = 2 }

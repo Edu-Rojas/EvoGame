@@ -52,22 +52,31 @@ def reproduce(w: World, ready: np.ndarray) -> int:
           # los mantendría siempre un poquito más lejos de lo necesario para aparearse
           & (dist <= (w.radius[cand] + w.radius[mate]) * m.body_footprint + m.contact_distance))
 
+    # Con la capacidad llena, aparearse no puede ser pura pérdida: si no, el tope de
+    # rendimiento castigaría a las especies que más se reproducen (y decidiría quién gana).
+    free = int((~w.alive).sum())
     used = np.zeros(len(w.alive), dtype=bool)
     batches: list[dict[str, np.ndarray]] = []
     for i, j, dl in zip(cand[ok], mate[ok], delta[ok]):
+        if free == 0:
+            break                         # las parejas que faltan no pagan; reintentan luego
         if used[i] or used[j]:
             continue                      # cada uno se aparea una vez por tick
         used[i] = used[j] = True
 
-        litter_energy = r.contribution * (w.energy[i] + w.energy[j])
-        w.energy[i] *= 1 - r.contribution
-        w.energy[j] *= 1 - r.contribution
+        planned = litter_size(w.genes[i, Gene.MATING], w.genes[j, Gene.MATING], w)
+        n = min(planned, free)
+        free -= n
+        # se paga solo por las crías que nacen: cada una recibe lo mismo que sin tope
+        paid = r.contribution * n / planned
+        litter_energy = paid * (w.energy[i] + w.energy[j])
+        w.energy[i] *= 1 - paid
+        w.energy[j] *= 1 - paid
         w.cooldown[i] = w.cooldown[j] = r.cooldown
         for p in (i, j):
             w.action[p] = Action.EXPLORE
             w.target[p] = NO_TARGET
 
-        n = litter_size(w.genes[i, Gene.MATING], w.genes[j, Gene.MATING], w)
         ga = np.tile(w.genes[i], (n, 1))
         gb = np.tile(w.genes[j], (n, 1))
         genes = mutate(crossover(ga, gb, w.rng), cfg.genes.mutation_sigma,

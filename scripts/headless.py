@@ -3,7 +3,7 @@
 Uso:
     python scripts/headless.py                    # 3000 ticks, config por defecto
     python scripts/headless.py --ticks 10000 --every 1000 --seed 7
-    python scripts/headless.py --config config/mi_prueba.toml
+    python scripts/headless.py --config mi_prueba.toml
 """
 from __future__ import annotations
 

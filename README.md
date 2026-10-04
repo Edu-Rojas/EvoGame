@@ -45,8 +45,8 @@ Controles del visor:
 
 ## Ajustar el balance
 
-Todos los números están en `config/default.toml`. Para experimentar, copia el archivo,
-cámbialo y córrelo con `--config config/mi_prueba.toml`. Si escribes mal una clave, la
+Todos los números están en `src/especies/data/default.toml` (viaja dentro del paquete). Para
+experimentar, copia el archivo donde quieras, cámbialo y córrelo con `--config mi_prueba.toml`. Si escribes mal una clave, la
 carga falla con un error claro en vez de ignorarla.
 
 ## Estructura

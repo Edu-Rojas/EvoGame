@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import tomllib
 from dataclasses import dataclass, fields
+from importlib.resources import files
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping
@@ -18,7 +19,8 @@ from typing import Any, Mapping
 from .genes import GENE_MAX, GENE_MIN, Gene
 from .terrain import Biome
 
-DEFAULT_PATH = Path(__file__).resolve().parents[2] / "config" / "default.toml"
+# Viaja dentro del paquete: funciona igual instalado con pip que desde el repo
+DEFAULT_CONFIG = files("especies") / "data" / "default.toml"
 
 
 # ---------- validación de rangos (cada dataclass la llama en __post_init__) ----------
@@ -300,8 +302,9 @@ def _build_species(raw: dict[str, Any], budget: int) -> SpeciesCfg:
 
 
 def load_config(path: str | Path | None = None) -> Config:
-    path = Path(path) if path else DEFAULT_PATH
-    with open(path, "rb") as f:
+    """Carga un TOML de config; sin `path`, la config por defecto del paquete."""
+    source = Path(path) if path else DEFAULT_CONFIG
+    with source.open("rb") as f:
         return config_from_dict(tomllib.load(f))
 
 

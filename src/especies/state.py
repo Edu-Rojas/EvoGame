@@ -73,9 +73,13 @@ class World:
     births_total: int = 0
     deaths_total: int = 0
 
-    @property
-    def size(self) -> np.ndarray:
-        return np.array([self.cfg.world.width, self.cfg.world.height])
+    # tamaño del mundo [ancho, alto]; se usa en cada wrap/torus_delta, así que se
+    # calcula una vez (no es una property que cree un array en cada lectura)
+    size: np.ndarray = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.size = np.array([self.cfg.world.width, self.cfg.world.height], dtype=float)
+        self.size.flags.writeable = False
 
     def alive_idx(self) -> np.ndarray:
         return np.flatnonzero(self.alive)

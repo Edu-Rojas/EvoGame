@@ -73,6 +73,9 @@ class TerrainRenderer:
         self.lush = self.biome_lush[t.biome] + texture
         self.bare = pal.stylize_terrain(bare)[t.biome] + texture
         self._prepare_decor(rng)
+        self._cache_key: tuple | None = None
+        self._cell_idx = np.zeros((0, 0), dtype=np.int64)
+        self._grain = np.zeros((0, 0, 1))
 
     def _prepare_decor(self, rng: np.random.Generator) -> None:
         n = len(self.t.biome)
@@ -100,9 +103,22 @@ class TerrainRenderer:
         return np.clip(rgb, 0, 255)
 
     def draw(self, canvas: pygame.Surface, v: View, time: float) -> None:
+        # Qué celda pinta cada píxel (con su dithering) y el grano solo cambian cuando
+        # se mueve la cámara: se cachean, y cada frame solo cambia el color del pasto
+        key = (float(v.center[0]), float(v.center[1]), v.zoom, v.canvas_size)
+        if key != self._cache_key:
+            self._cache_key = key
+            self._cell_idx, self._grain = self._pixel_map(v)
+        img = self.cell_colors()[self._cell_idx] + self._grain
+        pygame.surfarray.blit_array(canvas, np.clip(img, 0, 255).astype(np.uint8))
+
+        if self.t.cell_size * v.zoom >= DECOR_MIN_CELL_PX:
+            self._draw_decor(canvas, v, time)
+
+    def _pixel_map(self, v: View) -> tuple[np.ndarray, np.ndarray]:
+        """Para cada píxel del lienzo: índice de celda [cw, ch] y grano [cw, ch, 1]."""
         t = self.t
         cw, ch = v.canvas_size
-        rgb = self.cell_colors().reshape(t.gh, t.gw, 3)
 
         # coordenadas de mundo del centro de cada píxel del lienzo
         xs = v.center[0] + (np.arange(cw) + 0.5 - v.canvas_center[0]) / v.zoom
@@ -117,15 +133,11 @@ class TerrainRenderer:
         by = BAYER4.T[py[:, None] % 4, px[None, :] % 4]
         cx = (ix0[None, :] + (fx[None, :] > bx)) % t.gw
         cy = (iy0[:, None] + (fy[:, None] > by)) % t.gh
-        img = rgb[cy, cx]
         # grano de papel: ruido fijo por píxel de mundo
         h = (px[None, :] * 73856093) ^ (py[:, None] * 19349663)
         grain = ((h >> 7) & 7).astype(float) - 3.5
-        img = np.clip(img + grain[..., None], 0, 255).astype(np.uint8)
-        pygame.surfarray.blit_array(canvas, img.transpose(1, 0, 2))
-
-        if t.cell_size * v.zoom >= DECOR_MIN_CELL_PX:
-            self._draw_decor(canvas, v, time)
+        # surfarray usa [x, y]: se trasponen una vez aquí y no en cada frame
+        return (cy * t.gw + cx).T.copy(), grain.T[..., None].copy()
 
     def _visible_cells(self, v: View) -> tuple[np.ndarray, np.ndarray]:
         t = self.t

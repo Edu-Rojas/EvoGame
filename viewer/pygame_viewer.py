@@ -187,6 +187,9 @@ class Viewer:
         self.acc += dt * self.tps
         n = min(int(self.acc), 50)  # tope por frame para no congelar la ventana
         self.acc -= n
+        # Si la simulación no da abasto, se descarta el atraso: si no, al bajar la
+        # velocidad seguiría corriendo 50 ticks por frame hasta vaciarlo
+        self.acc = min(self.acc, 1.0)
         for _ in range(n):
             self.prev_pos = self.w.pos.copy()
             step(self.w)

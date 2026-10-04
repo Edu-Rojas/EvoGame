@@ -10,30 +10,26 @@ Controles:
     ESC                 salir
 
 Uso:
-    python viewer/pygame_viewer.py
-    python viewer/pygame_viewer.py --seed 7 --tps 20
+    python -m viewer
+    python -m viewer --seed 7 --tps 20
 """
 from __future__ import annotations
 
 import argparse
-import sys
-from pathlib import Path
 
 import numpy as np
 import pygame
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from especies.config import load_config
+from especies.genes import Gene, norm
+from especies.geometry import torus_delta, wrap
+from especies.metrics import describe_creature
+from especies.state import create_world
+from especies.step import step
+from especies.terrain import Biome
 
-from especies.config import load_config  # noqa: E402
-from especies.genes import Gene, norm  # noqa: E402
-from especies.metrics import describe_creature  # noqa: E402
-from especies.geometry import torus_delta, wrap  # noqa: E402
-from especies.state import create_world  # noqa: E402
-from especies.step import step  # noqa: E402
-from especies.terrain import Biome  # noqa: E402
-
-from animation import Rig  # noqa: E402
-from shapes import dim, growth, lighten  # noqa: E402
+from .animation import Rig
+from .shapes import dim, growth, lighten
 
 TXT = (240, 244, 248)
 SHADOW = (20, 22, 26)

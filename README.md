@@ -26,9 +26,9 @@ En Linux o macOS, `source .venv/bin/activate` en vez de la segunda línea.
 
 | Qué | Comando |
 |---|---|
-| Ver el mundo en vivo | `python viewer/pygame_viewer.py` |
-| Otra semilla / más rápido | `python viewer/pygame_viewer.py --seed 7 --tps 40` |
-| Simulación sin gráficos | `python scripts/headless.py --ticks 5000 --every 500` |
+| Ver el mundo en vivo | `python -m viewer` |
+| Otra semilla / más rápido | `python -m viewer --seed 7 --tps 40` |
+| Simulación sin gráficos | `especies-headless --ticks 5000 --every 500` |
 | Tests | `pytest` |
 
 Controles del visor:
@@ -53,21 +53,23 @@ carga falla con un error claro en vez de ignorarla.
 
 ```
 src/especies/      simulación pura (no sabe que existen los gráficos)
-  config.py        TOML -> dataclasses inmutables, valida claves y presupuesto de genes
+  config.py        TOML -> dataclasses inmutables, valida claves, rangos y presupuesto de genes
+  data/default.toml todos los números de balance
+  cli.py           especies-headless: simulación sin gráficos con reportes por especie
+  geometry.py      mundo toroidal: wrap y camino más corto
   genes.py         índices de genes, cruce uniforme, mutación, redondeo al azar
   state.py         World: criaturas como columnas de arrays + rasgos derivados de genes
   terrain.py       biomas (pradera, bosque, desierto, montaña, helada, agua) y pasto por celda
   perception.py    mejor celda de pasto + pareja más cercana (KD-tree en mundo toroidal)
   decision.py      utilidad por acción = instinto base x instinto heredable
-  physics.py       toro, movimiento, deterioro por vejez, separación de cuerpos
+  physics.py       movimiento, deterioro por vejez, separación de cuerpos
   metabolism.py    pastar (reparto justo), gasto (Kleiber + ojos + movimiento + bioma), muerte
   reproduction.py  apareamiento, tamaño de camada, herencia
   step.py          orden de los sistemas en un tick
   metrics.py       resúmenes por especie y ficha de criatura
 viewer/            visor pygame (solo lee el estado)
   animation.py     animación procedural: columna que sigue a la cabeza, patas con IK, plumas
-  pygame_viewer.py cámara con zoom, terreno, dibujo, interpolación entre ticks
-scripts/           headless
+  app.py           cámara con zoom, terreno, dibujo, interpolación entre ticks
 tests/             pytest
 ```
 

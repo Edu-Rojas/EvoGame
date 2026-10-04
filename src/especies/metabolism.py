@@ -32,11 +32,16 @@ def eat(w: World) -> None:
     if len(eaters) == 0:
         return
 
-    layers = (t.grass, t.leaves, t.meat)
-    eff = np.stack([w.plant_eff[eaters], w.plant_eff[eaters] * w.leaf_reach[eaters],
-                    w.meat_eff[eaters]], axis=1)
-    stock = np.stack([layer[cell] > 0 for layer in layers], axis=1)
-    rate = eff * stock                               # cuánto rinde cada capa disponible
+    # Orden de desempate: con el mismo rendimiento come primero lo que menos gente
+    # alcanza (hojas altas, después carne, después pasto). Así el ramoneador grande no
+    # le quita el pasto al chico teniendo hojas que solo él alcanza.
+    layers = (t.leaves, t.meat, t.grass)
+    eff = np.stack([w.plant_eff[eaters] * w.leaf_reach[eaters], w.meat_eff[eaters],
+                    w.plant_eff[eaters]], axis=1)
+    # energía que de verdad sacaría de cada capa en este bocado (no solo la eficiencia:
+    # un poco de pasto recién rebrotado no puede ganarle a un árbol lleno de hojas)
+    stock = np.stack([np.minimum(layer[cell], w.cfg.body.bite) for layer in layers], axis=1)
+    rate = eff * stock
     best = rate.argmax(axis=1)
     for k, layer in enumerate(layers):
         on = (best == k) & (rate[:, k] > 0)

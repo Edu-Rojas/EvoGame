@@ -53,14 +53,21 @@ def _color(name: str, c: tuple[int, ...]) -> None:
              f"{name}={list(c)} debe ser [r, g, b] con valores de 0 a 255")
 
 
+FOUNDER_SPAWNS = ("grouped", "uniform")
+
+
 @dataclass(frozen=True)
 class SimCfg:
     seed: int
     capacity: int
     think_interval: int
+    founder_spawn: str        # "grouped": cada especie en su zona; "uniform": por todo el mapa
+    founder_spread: float     # radio aproximado de la zona de cada especie (modo agrupado)
 
     def __post_init__(self) -> None:
-        _positive(self, "capacity", "think_interval")
+        _positive(self, "capacity", "think_interval", "founder_spread")
+        _require(self.founder_spawn in FOUNDER_SPAWNS,
+                 f"founder_spawn={self.founder_spawn!r} debe ser uno de {list(FOUNDER_SPAWNS)}")
 
 
 @dataclass(frozen=True)
@@ -165,9 +172,14 @@ class MovementCfg:
     contact_distance: float
     separation_strength: float
     body_footprint: float
+    home_range: float
+    home_pull: float
+    cover_seek: float
 
     def __post_init__(self) -> None:
-        _positive(self, "base_speed", "body_footprint")
+        _positive(self, "base_speed", "body_footprint", "home_range")
+        _fraction(self, "home_pull")
+        _non_negative(self, "cover_seek")
         _non_negative(self, "accel_speed_bonus", "wander_turn", "move_cost",
                       "contact_distance", "separation_strength")
         _fraction(self, "cruise_fraction", "veil_drag")
@@ -236,12 +248,14 @@ class CombatCfg:
     retaliation: float
     max_prey_ratio: float
     predator_meat_eff: float
+    idle_threat: float
     aggression_factor_min: float
     aggression_factor_max: float
     chase_ticks: int
     chase_min_mult: float
     chase_max_mult: float
     satiety_fraction: float
+    prey_search_half: float
     newborn_health_energy: float
     newborn_health_min: float
 
@@ -249,9 +263,9 @@ class CombatCfg:
         _positive(self, "health_per_size", "bite_base", "max_prey_ratio", "chase_ticks",
                   "aggression_factor_min", "newborn_health_energy")
         _non_negative(self, "bite_size_exponent", "weapons_herbivore", "weapons_carnivore",
-                      "bite_energy_cost", "retaliation", "chase_min_mult")
+                      "bite_energy_cost", "retaliation", "chase_min_mult", "prey_search_half")
         _fraction(self, "health_regen", "predator_meat_eff", "satiety_fraction",
-                  "newborn_health_min")
+                  "newborn_health_min", "idle_threat")
         _require(self.aggression_factor_max >= self.aggression_factor_min,
                  "aggression_factor_max debe ser >= aggression_factor_min")
         _require(self.chase_max_mult >= self.chase_min_mult,
@@ -268,6 +282,17 @@ class MeatCfg:
     def __post_init__(self) -> None:
         _non_negative(self, "per_size", "min_amount")
         _fraction(self, "energy_fraction", "rot")
+
+
+@dataclass(frozen=True)
+class DiseaseCfg:
+    radius: float
+    free_neighbors: int
+    cost_per_neighbor: float
+
+    def __post_init__(self) -> None:
+        _positive(self, "radius")
+        _non_negative(self, "free_neighbors", "cost_per_neighbor")
 
 
 @dataclass(frozen=True)
@@ -322,6 +347,7 @@ class Config:
     leaves: LeavesCfg
     combat: CombatCfg
     meat: MeatCfg
+    disease: DiseaseCfg
     behavior: BehaviorCfg
     stats: StatsCfg
     species: tuple[SpeciesCfg, ...]
@@ -331,7 +357,8 @@ SECTIONS: dict[str, type] = {
     "sim": SimCfg, "world": WorldCfg, "terrain": TerrainCfg, "genes": GenesCfg,
     "body": BodyCfg, "movement": MovementCfg, "detection": DetectionCfg,
     "diet": DietCfg, "reproduction": ReproductionCfg, "leaves": LeavesCfg,
-    "combat": CombatCfg, "meat": MeatCfg, "behavior": BehaviorCfg, "stats": StatsCfg,
+    "combat": CombatCfg, "meat": MeatCfg, "disease": DiseaseCfg, "behavior": BehaviorCfg,
+    "stats": StatsCfg,
 }
 SPECIES_KEYS = {"name", "color", "count", "genes"}
 
@@ -354,6 +381,8 @@ def _check_types(cls: type, data: Mapping[str, Any], section: str) -> None:
             raise ValueError(f"[{section}] {f.name}={v!r} debe ser un número entero")
         if f.type == "float" and (not isinstance(v, int | float) or isinstance(v, bool)):
             raise ValueError(f"[{section}] {f.name}={v!r} debe ser un número")
+        if f.type == "str" and not isinstance(v, str):
+            raise ValueError(f"[{section}] {f.name}={v!r} debe ser un texto")
 
 
 def _build(cls: type, data: dict[str, Any], section: str):

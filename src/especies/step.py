@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from .combat import fight, heal
 from .decision import decide, validate_targets
+from .disease import sicken
 from .metabolism import die, eat, regrow, spend
 from .perception import perceive
 from .physics import move, separate
@@ -34,6 +35,7 @@ def step(w: World) -> None:
     eat(w)
     reproduce(w, ready)
     spend(w)
+    sicken(w)
     heal(w)
     regrow(w)
     die(w)

@@ -4,8 +4,9 @@ Ecosistema evolutivo: cada jugador crea una especie repartiendo puntos entre gen
 criaturas comen, se aparean con herencia y mutación, envejecen y mueren. Nadie programa
 quién gana: sale de los costos y beneficios de cada gen.
 
-**Etapa actual: 1a.** Herbívoros en un mundo con biomas, pasto que rebrota, reproducción
-sexual y un visor de desarrollo en pixel art con animación procedural.
+**Etapa actual: 1b.** Herbívoros y carnívoros en un mundo con biomas: caza, huida,
+peleas, carne que se pudre y hojas altas que solo alcanzan los grandes. Visor de
+desarrollo en pixel art con animación procedural.
 
 ## Requisitos
 
@@ -29,6 +30,7 @@ En Linux o macOS, `source .venv/bin/activate` en vez de la segunda línea.
 | Ver el mundo en vivo | `python -m viewer` |
 | Otra semilla / más rápido | `python -m viewer --seed 7 --tps 40` |
 | Simulación sin gráficos | `especies-headless --ticks 5000 --every 500` |
+| Aceptación (varias semillas en paralelo) | `especies-acceptance --ticks 50000 --out resultado.md` |
 | Tests (todos / rápidos) | `pytest` / `pytest -m "not slow"` |
 | Lint y tipos | `ruff check .` y `mypy` |
 
@@ -62,38 +64,39 @@ src/especies/        simulación pura (no sabe que existen los gráficos)
   geometry.py        mundo toroidal: wrap y camino más corto
   genes.py           genes, cruce uniforme, mutación, redondeo al azar
   state.py           World: criaturas como columnas de arrays + rasgos derivados
-  terrain.py         biomas y pasto por celda
-  perception.py      mejor celda de pasto + pareja más cercana (KD-tree toroidal)
+  terrain.py         biomas; pasto, hojas altas y carne por celda
+  perception.py      comida, pareja, presa y amenaza (KD-trees por especie)
   decision.py        utilidad por acción = instinto base x instinto heredable
-  physics.py         movimiento, deterioro por vejez, separación de cuerpos
-  metabolism.py      pastar, gasto (Kleiber + ojos + movimiento + bioma), muerte
+  physics.py         movimiento, huida hacia la cobertura, filopatría, separación
+  combat.py          mordidas, devolución del golpe, regeneración
+  metabolism.py      comer, gasto (Kleiber + ojos + movimiento + bioma), muerte y carne
+  disease.py         enfermedad por densidad
   reproduction.py    apareamiento, tamaño de camada, herencia
   step.py            orden de los sistemas en un tick
   metrics.py         resúmenes por especie y ficha de criatura (datos crudos)
+  acceptance.py      especies-acceptance: corridas largas con varias semillas
 viewer/              visor pygame (solo lee el estado)
   animation.py       rig procedural en numpy: columna, patas con IK, garras, branquias
   palette.py         tinta, papel y colores por especie
   render.py          pixel art: terreno con dithering y garabatos, criaturas con LOD
   app.py             cámara, entrada, interpolación entre ticks y HUD
 tests/               pytest, un archivo por módulo
-docs/adr/            decisiones de arquitectura
 ```
 
 ## Documentación
 
 - [CHANGELOG.md](CHANGELOG.md): cambios por versión.
-- [docs/adr/](docs/adr/README.md): por qué el código está hecho así.
 
-## Qué hay en la 1a y qué falta
+## Qué hay hasta la 1b y qué falta
 
-- Activos: Tamaño, Aceleración (solo velocidad, sin fatiga), Detección, Apareamiento,
-  Dieta (todos herbívoros).
-- Agresividad y Camuflaje existen y se heredan, pero todavía no hacen nada, así que no
-  mutan (`[genes] inactive` en la config). Se activan en la 1b y la 1c.
-- En la 1a el Tamaño casi solo tiene costos (su única ventaja es aguantar el frío por la
-  regla de Bergmann), así que la selección lo empuja hacia abajo. No es un bug.
-- Con un solo recurso y sin depredadores, la especie que más se reproduce excluye a las
-  demás en una generación (exclusión competitiva). La coexistencia llega con nichos y
-  depredadores.
-- **1b:** carnívoros, cazar, huir, peleas, cadáveres y carroña.
+- Activos: Tamaño, Aceleración (solo velocidad, sin fatiga), Agresividad, Dieta,
+  Detección y Apareamiento. Camuflaje se hereda pero todavía no muta
+  (`[genes] inactive`): se activa en la 1c.
+- Carnívoros: cazan presas de otra especie hasta `max_prey_ratio` veces su tamaño
+  (refugio por tamaño), se sacian, se rinden si la persecución es larga y dejan carne.
+- Hojas altas en el bosque: el nicho propio de los grandes.
+- Coexistencia: sin mecanismos, la especie que más se reproduce excluye a las demás en
+  una generación. Las mecánicas que la estabilizan están en
+  [tests/test_stabilizers.py](tests/test_stabilizers.py). Hoy, en 4 de 5 semillas
+  sobreviven al menos 3 especies durante 50.000 ticks.
 - **1c:** camuflaje, esconderse/acechar, fatiga de Aceleración.

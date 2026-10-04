@@ -25,7 +25,12 @@ def utilities(w: World, thinkers: np.ndarray, p: Perception, ready: np.ndarray) 
     u[:, Action.EXPLORE] = b.explore_base
     u[:, Action.EAT] = (p.food != NO_TARGET) * (b.eat_base + hunger)
     u[:, Action.MATE] = (p.mate != NO_TARGET) * ready[thinkers] * b.mate_base
-    u[:, Action.HUNT] = ((p.prey != NO_TARGET) & ~sated) * b.hunt_base * hunger * w.meat_eff[thinkers]
+    # imagen de búsqueda (Holling tipo III): con presas escasas a la vista casi no vale la
+    # pena salir a cazar; la presa rara encuentra refugio en su rareza y se recupera
+    denom = p.prey_seen + c.prey_search_half
+    search_image = np.divide(p.prey_seen, denom, out=np.ones(len(thinkers)), where=denom > 0)
+    u[:, Action.HUNT] = (((p.prey != NO_TARGET) & ~sated) * b.hunt_base * hunger
+                         * w.meat_eff[thinkers] * search_image)
     u[:, Action.FLEE] = b.flee_base * p.threat_level
     return u * w.instinct[thinkers]
 

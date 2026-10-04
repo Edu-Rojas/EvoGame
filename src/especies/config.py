@@ -10,11 +10,12 @@ Por qué así:
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from importlib.resources import files
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from .genes import GENE_MAX, GENE_MIN, Gene
 from .terrain import Biome
@@ -297,7 +298,7 @@ def _build_species(raw: dict[str, Any], budget: int) -> SpeciesCfg:
     if unknown:
         raise ValueError(f"Especie {name}: genes desconocidos {sorted(unknown)}")
     values = tuple(float(genes_raw.get(g.key, GENE_MIN)) for g in Gene)
-    for g, v in zip(Gene, values):
+    for g, v in zip(Gene, values, strict=True):
         if not GENE_MIN <= v <= GENE_MAX:
             raise ValueError(f"Especie {name}: {g.key}={v} fuera de 1..10")
     spent = sum(v - GENE_MIN for v in values)

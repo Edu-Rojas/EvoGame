@@ -129,12 +129,12 @@ class Rig:
         lost = off > leg_len[:, None] * 2.5                 # se teletransportó: reubicar
         feet[lost] = ideal[lost]
         group_busy = np.stack([
-            (stepping & (LEG_GROUP == g)).any(axis=1) for g in (0, 1)], axis=1)
+            (stepping & (g == LEG_GROUP)).any(axis=1) for g in (0, 1)], axis=1)
         other_busy = group_busy[:, 1 - LEG_GROUP]           # [n, 4]
         start = (~stepping) & (off > leg_len[:, None] * 0.65) & (~other_busy)
         # solo una diagonal a la vez: si las dos quieren, gana la más atrasada
         both = start[:, LEG_GROUP == 0].any(axis=1) & start[:, LEG_GROUP == 1].any(axis=1)
-        need = np.stack([np.where(LEG_GROUP == g, off, 0).max(axis=1) for g in (0, 1)], axis=1)
+        need = np.stack([np.where(g == LEG_GROUP, off, 0).max(axis=1) for g in (0, 1)], axis=1)
         loser = np.where(need[:, 0] >= need[:, 1], 1, 0)
         start &= ~(both[:, None] & (LEG_GROUP[None, :] == loser[:, None]))
 

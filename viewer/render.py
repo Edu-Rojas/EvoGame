@@ -155,7 +155,7 @@ class TerrainRenderer:
         pos = (origin[ii] + self.decor_off[cell[ii], kk] * cs * z).tolist()
         size = (self.decor_size[cell[ii], kk] * cs * z).tolist()
         seed = self.decor_seed[cell[ii], kk].tolist()
-        for j, (i, k) in enumerate(zip(ii.tolist(), kk.tolist())):
+        for j, (i, k) in enumerate(zip(ii.tolist(), kk.tolist(), strict=True)):
             c = int(cell[i])
             self._draw_one(canvas, int(kind[i, k]), pos[j], size[j], c, seed[j],
                            int(self.decor_color[c, k]), time)
@@ -217,9 +217,9 @@ class CreatureRenderer:
         if tiny.any():
             self._draw_tiny(canvas, head_canvas[tiny], species[tiny])
         small = ~tiny & (px_r < DETAIL_MIN_PX)
-        for i in np.flatnonzero(small):
-            c = self.colors[species[i]]
-            p, r = head_canvas[i], px_r[i]
+        for j in np.flatnonzero(small):
+            c = self.colors[species[j]]
+            p, r = head_canvas[j], px_r[j]
             pygame.draw.circle(canvas, pal.INK, p, r + 1)
             pygame.draw.circle(canvas, c.body, p, r)
             pygame.draw.circle(canvas, c.accent, p, max(1.0, r * 0.6))
@@ -294,7 +294,7 @@ class CreatureRenderer:
             pygame.draw.polygon(canvas, bodies[i], body[i])
             if r >= 5:
                 pygame.draw.polygon(canvas, c.light, light[i])
-                for p, sr in zip(spot_pos[i], spot_r[i]):
+                for p, sr in zip(spot_pos[i], spot_r[i], strict=True):
                     pygame.draw.circle(canvas, c.shade, p, sr)
             # cabeza de color vivo y ojos de tinta
             pygame.draw.polygon(canvas, c.accent, head[i])
@@ -317,12 +317,12 @@ class CreatureRenderer:
     def _draw_tiny(self, canvas: pygame.Surface, pos: np.ndarray, species: np.ndarray) -> None:
         """Lejos: cada criatura es un píxel del color de su cabeza con un píxel de sombra."""
         w, h = canvas.get_size()
-        x = np.floor(pos[:, 0]).astype(int)
-        y = np.floor(pos[:, 1]).astype(int)
-        ok = (x >= 0) & (x < w - 1) & (y >= 0) & (y < h - 1)
-        x, y, species = x[ok], y[ok], species[ok]
+        cols = np.floor(pos[:, 0]).astype(int)
+        rows = np.floor(pos[:, 1]).astype(int)
+        ok = (cols >= 0) & (cols < w - 1) & (rows >= 0) & (rows < h - 1)
+        cols, rows, species = cols[ok], rows[ok], species[ok]
         accent = np.array([c.accent for c in self.colors])[species]
         px = pygame.surfarray.pixels3d(canvas)
-        px[x + 1, y + 1] = pal.INK
-        px[x, y] = accent
+        px[cols + 1, rows + 1] = pal.INK
+        px[cols, rows] = accent
         del px                                      # libera el bloqueo de la superficie

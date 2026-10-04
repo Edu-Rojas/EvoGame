@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from .perception import Perception
-from .state import Action, NO_TARGET, World
+from .state import NO_TARGET, Action, World
 
 
 def utilities(w: World, thinkers: np.ndarray, p: Perception, ready: np.ndarray) -> np.ndarray:

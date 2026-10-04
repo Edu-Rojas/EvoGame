@@ -15,9 +15,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
+
+if TYPE_CHECKING:   # config importa este módulo: solo para los tipos, sin ciclo en ejecución
+    from .config import Config, TerrainCfg
 
 
 class Biome(IntEnum):
@@ -56,8 +60,8 @@ class Terrain:
     speed: np.ndarray       # [gh*gw] multiplicador de velocidad
     visibility: np.ndarray  # [gh*gw] multiplicador del radio de detección
     cost: np.ndarray        # [gh*gw] multiplicador de gasto de energía
-    food_offsets: np.ndarray = None   # [O, 2] desplazamientos (dx, dy) en celdas
-    food_offset_dist: np.ndarray = None  # [O] distancia de cada desplazamiento
+    food_offsets: np.ndarray      # [O, 2] desplazamientos (dx, dy) en celdas
+    food_offset_dist: np.ndarray  # [O] distancia de cada desplazamiento
 
     def cell_of(self, pos: np.ndarray) -> np.ndarray:
         cx = (pos[..., 0] // self.cell_size).astype(np.int64) % self.gw
@@ -79,7 +83,7 @@ def _smooth_field(rng: np.random.Generator, shape: tuple[int, int], scale: float
     return (ranks / (ranks.size - 1)).reshape(shape)
 
 
-def generate_biomes(rng: np.random.Generator, gh: int, gw: int, t) -> np.ndarray:
+def generate_biomes(rng: np.random.Generator, gh: int, gw: int, t: TerrainCfg) -> np.ndarray:
     """Clasifica cada celda según elevación, humedad y temperatura."""
     elev = _smooth_field(rng, (gh, gw), t.noise_scale)
     moist = _smooth_field(rng, (gh, gw), t.noise_scale)
@@ -94,7 +98,7 @@ def generate_biomes(rng: np.random.Generator, gh: int, gw: int, t) -> np.ndarray
     return b.ravel()
 
 
-def create_terrain(cfg, rng: np.random.Generator) -> Terrain:
+def create_terrain(cfg: Config, rng: np.random.Generator) -> Terrain:
     t = cfg.terrain
     gw = int(round(cfg.world.width / t.cell_size))
     gh = int(round(cfg.world.height / t.cell_size))
@@ -105,31 +109,32 @@ def create_terrain(cfg, rng: np.random.Generator) -> Terrain:
         return table[biome]
 
     grass_max = per_cell("max_grass") * t.grass_per_cell
-    terrain = Terrain(
+    visibility = per_cell("visibility")
+    d = cfg.detection
+    offsets, offset_dist = food_offsets(t.cell_size,
+                                        d.base_radius * d.max_multiplier * float(visibility.max()))
+    return Terrain(
         cell_size=t.cell_size, gw=gw, gh=gh, biome=biome,
         grass=grass_max * rng.random(biome.size),
         grass_max=grass_max,
         regrow=per_cell("regrow"),
         speed=per_cell("speed"),
-        visibility=per_cell("visibility"),
+        visibility=visibility,
         cost=per_cell("cost"),
+        food_offsets=offsets,
+        food_offset_dist=offset_dist,
     )
-    _precompute_food_offsets(terrain, cfg)
-    return terrain
 
 
-def _precompute_food_offsets(terrain: Terrain, cfg) -> None:
+def food_offsets(cell_size: float, r_max: float) -> tuple[np.ndarray, np.ndarray]:
     """Desplazamientos (en celdas) dentro del radio de búsqueda más grande posible.
 
     Se calculan una vez; al buscar comida cada criatura los suma a su celda y luego
     filtra por su propio radio. Es el mismo truco del KD-tree: buscar con el máximo
     y filtrar con el individual.
     """
-    d = cfg.detection
-    r_max = d.base_radius * d.max_multiplier * terrain.visibility.max()
-    n = int(np.ceil(r_max / terrain.cell_size))
+    n = int(np.ceil(r_max / cell_size))
     dy, dx = np.mgrid[-n:n + 1, -n:n + 1]
-    dist = np.hypot(dx, dy) * terrain.cell_size
+    dist = np.hypot(dx, dy) * cell_size
     keep = dist <= r_max
-    terrain.food_offsets = np.stack([dx[keep], dy[keep]], axis=1)
-    terrain.food_offset_dist = dist[keep]
+    return np.stack([dx[keep], dy[keep]], axis=1), dist[keep]

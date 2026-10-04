@@ -8,10 +8,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .genes import (GENE_MAX, GENE_MIN, Gene, crossover, mutate, mutation_sigmas, norm,
-                    stochastic_round)
+from .genes import GENE_MAX, GENE_MIN, Gene, crossover, mutate, mutation_sigmas, norm, stochastic_round
 from .geometry import torus_delta
-from .state import Action, NO_TARGET, World, spawn
+from .state import NO_TARGET, Action, World, spawn
 
 
 def ready_mask(w: World) -> np.ndarray:
@@ -60,7 +59,7 @@ def reproduce(w: World, ready: np.ndarray) -> int:
     sigmas = mutation_sigmas(cfg.genes.mutation_sigma, cfg.genes.inactive)
     used = np.zeros(len(w.alive), dtype=bool)
     batches: list[dict[str, np.ndarray]] = []
-    for i, j, dl in zip(cand[ok], mate[ok], delta[ok]):
+    for i, j, dl in zip(cand[ok], mate[ok], delta[ok], strict=True):
         if free == 0:
             break                         # las parejas que faltan no pagan; reintentan luego
         if used[i] or used[j]:

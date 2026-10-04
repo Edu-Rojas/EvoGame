@@ -10,12 +10,13 @@ Por qué arrays y no un objeto por criatura:
 """
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass, field
 
 import numpy as np
 
 from .config import Config
-from .genes import Gene, N_GENES, mutation_sigmas, norm
+from .genes import N_GENES, Gene, mutation_sigmas, norm
 from .geometry import wrap
 from .terrain import Terrain, create_terrain
 
@@ -113,7 +114,7 @@ def create_world(cfg: Config, seed: int | None = None) -> World:
     if seed is None:
         seed = cfg.sim.seed
     if seed < 0:
-        seed = int(np.random.SeedSequence().entropy % (2**31))
+        seed = secrets.randbits(31)   # semilla nueva del sistema operativo (se imprime)
     rng = np.random.default_rng(seed)
     w = World(cfg=cfg, rng=rng, seed=seed)
     n = cfg.sim.capacity

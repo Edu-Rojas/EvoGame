@@ -43,9 +43,9 @@ _GENE_KEYS = {
 N_GENES = len(Gene)
 
 
-def norm(values: np.ndarray) -> np.ndarray:
+def norm(values: np.ndarray | float) -> np.ndarray:
     """Gen 1..10 -> 0..1. Casi todas las fórmulas trabajan con este x."""
-    return (values - GENE_MIN) / (GENE_MAX - GENE_MIN)
+    return (np.asarray(values, dtype=float) - GENE_MIN) / (GENE_MAX - GENE_MIN)
 
 
 def crossover(a: np.ndarray, b: np.ndarray, rng: np.random.Generator) -> np.ndarray:

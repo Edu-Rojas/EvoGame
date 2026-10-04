@@ -5,7 +5,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from .geometry import torus_delta, wrap
-from .state import Action, NO_TARGET, World
+from .state import NO_TARGET, Action, World
 
 # Al acercarse al objetivo la velocidad deseada es esta fracción de la distancia que
 # falta: frena suave en vez de pasarse (numérica, no balance)

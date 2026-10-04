@@ -5,7 +5,7 @@ import numpy as np
 
 from .genes import Gene
 from .geometry import torus_delta
-from .state import Action, NO_TARGET, World
+from .state import NO_TARGET, Action, World
 from .terrain import Biome
 
 # Cuán cerca del centro de la celda hay que estar para pastar, en celdas (geometría:

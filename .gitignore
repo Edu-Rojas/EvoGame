@@ -1,5 +1,33 @@
+# Python
 __pycache__/
 *.pyc
 .venv/
 *.egg-info/
+build/
+dist/
+
+# Herramientas
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Secretos y configuración local: nunca al repo
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+*.local.toml
+
+# Editores y sistema
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

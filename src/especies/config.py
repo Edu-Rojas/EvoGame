@@ -179,10 +179,9 @@ class DetectionCfg:
     max_multiplier: float
     appetite_extra_at_max: float
     appetite_curve: float
-    k_neighbors: int
 
     def __post_init__(self) -> None:
-        _positive(self, "base_radius", "k_neighbors", "appetite_curve")
+        _positive(self, "base_radius", "appetite_curve")
         _non_negative(self, "appetite_extra_at_max")
         _require(self.max_multiplier >= 1,
                  f"max_multiplier={self.max_multiplier} debe ser >= 1")

@@ -7,8 +7,6 @@ aleatoriedad sale de w.rng. Por eso misma semilla = misma simulación.
 """
 from __future__ import annotations
 
-from scipy.spatial import cKDTree
-
 from .decision import decide, validate_targets
 from .metabolism import die, eat, regrow_grass, spend
 from .perception import perceive
@@ -26,9 +24,7 @@ def step(w: World) -> None:
     slots = w.alive_idx()
     thinkers = slots[(w.tick + slots) % w.cfg.sim.think_interval == 0]
     if len(thinkers) > 0:
-        # Árbol de criaturas: se reconstruye cada tick porque se mueven (es barato).
-        tree = cKDTree(w.pos[slots], boxsize=w.size)
-        p = perceive(w, thinkers, ready, tree, slots)
+        p = perceive(w, thinkers, ready)
         decide(w, thinkers, p, ready)
 
     move(w)
@@ -44,4 +40,3 @@ def step(w: World) -> None:
 def run(w: World, ticks: int) -> None:
     for _ in range(ticks):
         step(w)
-

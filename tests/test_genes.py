@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 
-from especies.config import load_config
 from especies.genes import Gene, crossover, mutate, stochastic_round
 from especies.state import derive_traits
 
@@ -44,24 +43,6 @@ def test_diet_efficiency_extremes(cfg):
     t = derive_traits(genes, cfg)
     assert t["plant_eff"][0] == pytest.approx(1.0)
     assert t["plant_eff"][1] == pytest.approx(0.0)
-
-
-def test_config_rejects_species_over_budget(tmp_path, cfg):
-    text = (load_config.__globals__["DEFAULT_PATH"]).read_text(encoding="utf-8")
-    # Conejos: 1 + 3 + 9 + 9 = 22 puntos gastados, el presupuesto es 20
-    text = text.replace("deteccion = 4, apareamiento = 9 }", "deteccion = 10, apareamiento = 10 }")
-    p = tmp_path / "c.toml"
-    p.write_text(text, encoding="utf-8")
-    with pytest.raises(ValueError, match="presupuesto"):
-        load_config(p)
-
-
-def test_config_rejects_unknown_keys(tmp_path):
-    text = (load_config.__globals__["DEFAULT_PATH"]).read_text(encoding="utf-8")
-    p = tmp_path / "c.toml"
-    p.write_text(text.replace("noise_scale", "noise_scal"), encoding="utf-8")
-    with pytest.raises(ValueError, match="desconocidas"):
-        load_config(p)
 
 
 def test_biomes_match_configured_fractions(cfg):

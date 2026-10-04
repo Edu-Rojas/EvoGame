@@ -1,14 +1,31 @@
 import numpy as np
-from scipy.spatial import cKDTree
 
 from especies.perception import perceive
 from especies.state import NO_TARGET
 
 
 def _perceive(w, ready):
-    slots = w.alive_idx()
-    tree = cKDTree(w.pos[slots], boxsize=w.size)
-    return perceive(w, slots, ready, tree, slots)
+    return perceive(w, w.alive_idx(), ready)
+
+
+def test_mate_is_found_behind_a_crowd_of_another_species(make_world):
+    """Regresión: buscar entre los K vecinos de cualquier especie dejaba ciega a la
+    minoría rodeada por otra especie (favorecía a la más numerosa)."""
+    n_other = 12
+    ring = 500.0 + 8.0 * np.stack([np.cos(np.linspace(0, 6.2, n_other)),
+                                   np.sin(np.linspace(0, 6.2, n_other))], axis=1)
+    pos = np.vstack([[[500.0, 500.0], [530.0, 500.0]], ring])
+    w = make_world(n=2 + n_other, species=[0, 0] + [1] * n_other, det_radius=200.0, pos=pos)
+    p = _perceive(w, w.alive.copy())
+    assert p.mate[0] == 1
+
+
+def test_unready_creatures_do_not_look_for_mates(make_world):
+    w = make_world(n=2, species=0, det_radius=100.0, pos=[[500.0, 500.0], [510.0, 500.0]])
+    ready = w.alive.copy()
+    ready[0] = False
+    p = _perceive(w, ready)
+    assert p.mate[0] == NO_TARGET
 
 
 def test_mate_is_nearest_ready_same_species_and_never_itself(make_world):

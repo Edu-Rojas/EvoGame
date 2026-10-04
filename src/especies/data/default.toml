@@ -121,8 +121,6 @@ base_radius = 40.0
 max_multiplier = 3.0         # detección 10 = 3 veces el radio base
 appetite_extra_at_max = 0.25 # detección 10 = +25% de gasto basal
 appetite_curve = 2.0         # forma de ese costo: 2 = proporcional al área que cubre la vista
-k_neighbors = 8              # vecinos que mira cada criatura al pensar
-
 [diet]
 exponent = 1.5   # >1 castiga a los omnívoros, <1 los favorece, 1 es neutro
 
